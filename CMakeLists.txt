@@ -169,7 +169,8 @@ add_library( njoy ${njoy_library_linkage}
              "${CMAKE_CURRENT_SOURCE_DIR}/src/util.f90"
              "${CMAKE_CURRENT_SOURCE_DIR}/src/vers.f90"
              "${CMAKE_CURRENT_SOURCE_DIR}/src/viewr.f90"
-             "${CMAKE_CURRENT_SOURCE_DIR}/src/wimsr.f90" )
+             "${CMAKE_CURRENT_SOURCE_DIR}/src/wimsr.f90"
+             "${CMAKE_CURRENT_SOURCE_DIR}/src/cthermr.f90" )
 
 target_include_directories( njoy PUBLIC "${CMAKE_Fortran_MODULE_DIRECTORY}" )
 

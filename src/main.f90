@@ -120,6 +120,7 @@ program njoy
    use unresm  ! provides unresr
    use heatm   ! provides heatr
    use thermm  ! provides thermr
+   use cthermm ! provides cthermr
    use groupm  ! provides groupr
    use gaminm  ! provides gaminr
    use errorm  ! provides errorr
@@ -140,7 +141,7 @@ program njoy
    use gaspm   ! provides gaspr
 
    implicit none
-   character(6)::module
+   character(7)::module
    character(8)::date
    character(8)::time
    character(28)::strng
@@ -206,6 +207,9 @@ program njoy
 
       case('thermr') ! compute thermal scattering cross sections
          call thermr
+
+      case('cthermr') ! compute continuous thermal scattering XS data
+         call cthermr
 
       case('groupr')  ! compute self-shielded multigroup cross sections
          call groupr
