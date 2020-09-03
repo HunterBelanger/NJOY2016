@@ -30,18 +30,17 @@ module cthermm
   use locale
   implicit none
   private
+
   public cthermr
 
   !-------------------------------------------------------------------
   ! GLOBAL VARIABLES
   !-------------------------------------------------------------------
-  integer::nendf,nin,nout,nscr
-  ! material number, number of coefficients in fit, number of temperatures
-  integer::mat, nfit, ntemp
-  real(kr),dimension(:),allocatable::scr
-  real(kr),dimension(:),allocatable::bufo,bufn
-  ! temperatures, walter-debye integrals
-  real(kr),dimension(:),allocatable::temps,wdi
+  integer:: mat, nin, nout
+  integer:: lat, lasym, lln, ns, ni, ntemps, nbetas, nalphas
+  real(kr):: b(24) ! Max len of B(N) is 24 from ENDF manual p. 151
+  real(kr), dimension(:), allocatable:: alpha, beta, temps, energies
+  real(kr), dimension(:,:,:), allocatable:: s_a_b_t
 
 contains
 
@@ -49,17 +48,18 @@ contains
     use mainio
     use endf
     use util
-    implicit none
     !-----------------------------------------------------------------
     ! LOCAL VARIABLES
     !-----------------------------------------------------------------
-    real(kr)::time
+    real(kr):: time
     real(kr):: a(17)
     character(4):: ta(17)
     equivalence(a(1), ta(1))
-    integer:: i, j, nb, nw, nwd, nxc, nsub
-    real(kr), dimension(:), allocatable:: src
-    character(66) :: string
+    integer:: nwd, nxc, nsub ! Numbers from ENDF format
+    integer:: i, nb, nw ! nb and nw from NJOY dev info in manual
+    real(kr), dimension(:), allocatable:: dict
+    logical :: inco_ela = .false., co_ela = .false., inco_inela = .false.
+    
 
     ! Initialize module
     call timer(time)
@@ -73,27 +73,28 @@ contains
     ! This is because the input ENDF file should be a thermal scattering data
     ! file which is "self contained", and does not need to be reconstructed
     ! or Doppler broadened.
-    read(nsysi,*) nendf, nout, mat
+    read(nsysi,*) nin, nout, mat
     if(nout.lt.0) call error('cthermr', 'Only ASCII output allowed.',' ')
+    ! TODO write input, output, and mat to nsyso
 
     ! Open input and output files
-    call openz(nendf,0)
+    call openz(nin,0)
     call openz(nout,1)
 
     ! Rewind files to the beginning
-    call repoz(nendf)
+    call repoz(nin)
     call repoz(nout)
 
     ! Get tapeid
-    call tpidio(nendf,0,0,a,nb,nw)
+    call tpidio(nin,0,0,a,nb,nw)
 
     ! Find the beginning of the desired mat in file (only relivant if there
     ! are multiple materials per file, which is allowed but uncommon
-    call findf(mat, 1, 451, nendf)
+    call findf(mat, 1, 451, nin)
     
     ! Read 4 CONT records (first is a HEAD)
     do i = 1, 4
-      call contio(nendf,0,0,a,nb,nw)
+      call contio(nin,0,0,a,nb,nw)
       if (i.eq.3) then
         nsub = n1h
       end if
@@ -101,8 +102,7 @@ contains
 
     ! Check nsub to make sure this is a thermal scattering neutron file
     if (nsub.ne.12) then
-      string = 'Input tape is not thermal scattering neutron data'
-      call error('cthermr',string,'')
+      call error('cthermr','Input tape does not contain thermal neutron scattering data','')
     end if
 
     ! The number of text cards before directory is now in the n1 variable,
@@ -113,26 +113,148 @@ contains
 
     ! Read all text lines
     do i = 1, nwd
-      call tpidio(nendf,0,0,a,nb,nw)
+      call tpidio(nin,0,0,a,nb,nw)
     end do
 
-    ! Allocate src
-    allocate(src(npage+50))
+    ! Allocate dict
+    allocate(dict(nxc * 6))
     nw = nxc 
-    ! Read all nxc dictionary records.
+    ! Read all nxc dictionary records (use 6*nxc for zeros).
     ! Keep notes as to what records are provided
-    call dictio(nendf,0,0,src,nb,nw)
+    call dictio(nin,0,0,dict,nb,nw)
 
+    ! check for reaction types
     do i = 1, nxc
-      write(*,*) src((i-1)*6 + 3), src((i-1)*6 + 4), src((i-1)*6 + 5), src((i-1)*6 + 6)
+      if ((dict((i-1)*6 + 3) .eq. 7) .and. (dict((i-1)*6 + 4) .eq. 4)) then
+          ! Check for incoherent inelastic scattering MF=7, MT=4
+          inco_inela = .true.
+      else if ((dict((i-1)*6 + 3) .eq. 7) .and. (dict((i-1)*6 + 4) .eq. 3)) then
+          inco_ela = .true.
+      else if ((dict((i-1)*6 + 3) .eq. 7) .and. (dict((i-1)*6 + 4) .eq. 2)) then
+          co_ela = .true.
+      end if
     end do
+    ! TODO write which reactions are contained in file to nsyso
+
+    if (inco_inela) then
+      call read_s_a_b_t_table()
+    end if
 
     ! Read First Card
     !read(nsysi,*) mat, nfit
     !if(nfit.lt.10) call error('cthermr', 'Must have a fit of at least 10.',' ')
+
+    ! Deallocate arrays
+    if (allocated(dict)) deallocate(dict)
+    if (allocated(alpha)) deallocate(alpha)
+    if (allocated(beta)) deallocate(beta)
+    if (allocated(temps)) deallocate(temps)
+    if (allocated(energies)) deallocate(energies)
+    if (allocated(s_a_b_t)) deallocate(s_a_b_t)
     
     ! End timer call
     call timer(time)
   end subroutine cthermr
+
+  subroutine read_s_a_b_t_table()
+    use mainio
+    use endf
+    use util
+    real(kr):: a(17)
+    integer:: i, b_i, a_i, t_i, nb, nw, loc, low
+    real(kr):: tmp(5*npage)
+
+    ! Find MF 7 MT 4 in input file
+    call findf(mat, 7, 4, nin)
+
+    ! Read head
+    call contio(nin, 0, 0, a, nb, nw)
+    lat = l2h
+    lasym = n1h
+
+    ! Read list of B(N)
+    call listio(nin, 0, 0, tmp, nb, nw)
+    if (nb .ne. 0) then
+      call error('cthermr','B(N) list longer than 24. Should not be possible','')
+    else
+      ni = n1h
+      ns = n2h
+      do i = 1, ni
+        b(i) = tmp(6+i)
+      end do
+    end if
+    
+
+    ! Read tab2 with info on beta
+    call tab2io(nin, 0, 0, a, nb, nw)
+    nbetas = n2h
+    allocate(beta(nbetas))
+
+    ! Read in data for all betas
+    do b_i = 1, nbetas
+      loc = 1
+      call tab1io(nin, 0, 0, tmp(loc), nb, nw)
+      if(b_i .eq. 1) then
+        nalphas = n2h
+        ntemps = l1h + 1
+        low = 6 + 2*n1h
+        allocate(alpha(nalphas))
+        allocate(temps(ntemps))
+        allocate(s_a_b_t(nbetas,nalphas,ntemps))
+      end if
+      if (nalphas > 2*5*npage) then
+        call error('cthermr','Cant fit all alphas in tmp','')
+      end if
+      loc = loc + nw
+      do while (nb .ne. 0)
+        call moreio(nin, 0, 0, tmp(loc), nb, nw)
+        loc = loc + nw
+      end do
+      beta(b_i) = c2h
+
+      ! Assign all alphas for T0
+      a_i = 1
+      do i = 1, 2*nalphas, 2
+        ! Only save alphas for first run
+        if (b_i .eq. 1) then
+          alpha(a_i) = tmp(low+i)
+          temps(1) = c1h
+        else
+          if(alpha(a_i) .ne. tmp(low+i)) &
+            & call error('cthermr','Apha dissagrement','')
+
+          if(temps(1) .ne. c1h) &
+            & call error('cthermr','Temperature dissagrement','')
+        end if
+        s_a_b_t(b_i, a_i, 1) = tmp(low+i+1)
+        a_i = a_i + 1
+      end do
+
+      !read in other lists for all temperatures
+      do t_i = 2, ntemps
+        call listio(nin, 0, 0, tmp, nb, nw)
+        if (nb .ne. 0) then
+          call error('cthermr','list was not completely read','')
+        end if
+
+        if (b_i .eq. 1) then
+          temps(t_i) = c1h
+        else
+          if(temps(t_i) .ne. c1h) &
+            & call error('cthermr','Temperature dissagrement','')
+        endif
+
+        do a_i = 1, nalphas
+          s_a_b_t(b_i, a_i, t_i) = tmp(6+a_i)
+        end do
+      end do
+    end do
+    
+    ! TODO write numbers
+    ! TODO two betas
+    ! TODO write alphas
+    ! TODO write temps
+
+  end subroutine read_s_a_b_t_table
 
 end module cthermm
