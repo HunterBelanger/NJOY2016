@@ -40,12 +40,14 @@ module cthermm
   !-------------------------------------------------------------------
   integer:: mat, nin, nout
   integer:: lat, lasym, lln, ns, ni, ntemps, nbetas, nalphas
+  integer:: lthr ! Determines coherent elastic (1) or incoherent elastic (2)
   real(kr):: b(24) ! Max len of B(N) is 24 from ENDF manual p. 151
   real(kr), dimension(:), allocatable:: alpha, beta, temps, energies
   real(kr), dimension(:,:,:), allocatable:: s_a_b_t
 
 contains
-
+  !============================================================================
+  ! Main CTHERMR subroutine
   subroutine cthermr
     use mainio
     use endf
@@ -60,7 +62,7 @@ contains
     integer:: nwd, nxc, nsub ! Numbers from ENDF format
     integer:: i, nb, nw ! nb and nw from NJOY dev info in manual
     real(kr), dimension(:), allocatable:: dict
-    logical :: inco_ela = .false., co_ela = .false., inco_inela = .false.
+    logical :: elastic = .false., inco_inelastic = .false.
     
 
     ! Initialize module
@@ -128,17 +130,23 @@ contains
     ! check for reaction types in dictionary
     do i = 1, nxc
       if ((dict((i-1)*6 + 3) .eq. 7) .and. (dict((i-1)*6 + 4) .eq. 4)) then
-          ! Check for incoherent inelastic scattering MF=7, MT=4
-          inco_inela = .true.
-      else if ((dict((i-1)*6 + 3) .eq. 7) .and. (dict((i-1)*6 + 4) .eq. 3)) then
-          inco_ela = .true.
+        ! Check for incoherent inelastic scattering MF=7, MT=4. This should
+        ! ALWAYS be present, but I make sure just in case.
+        inco_inelastic = .true.
       else if ((dict((i-1)*6 + 3) .eq. 7) .and. (dict((i-1)*6 + 4) .eq. 2)) then
-          co_ela = .true.
+        ! Coherent and Incoherent elastic are both in MT=2, because there never
+        ! are both present. It is only one or the other. It must be checked latter
+        ! if it is Coherent or Incoherent
+        elastic = .true.
       end if
     end do
     ! TODO write which reactions are contained in file to nsyso
 
-    if (inco_inela) then
+    if (elastic) then
+      call process_elastic_data()
+    end if
+
+    if (inco_inelastic) then
       call read_s_a_b_t_table()
     end if
 
@@ -157,7 +165,29 @@ contains
     ! End timer call
     call timer(time)
   end subroutine cthermr
+  
+  !============================================================================
+  ! Subroutine to determine Coherent or Incoherent Elastic
+  subroutine process_elastic_data()
+    use mainio
+    use endf
+    use util
+    integer:: i, nb, nw
+    real(kr):: a(17)
+    
+    ! Find MF 7 MT 4 in input file
+    call findf(mat, 7, 2, nin)
 
+    ! Read in head
+    call contio(nin, 0, 0, a, nb, nw)
+    lthr = l1h
+
+    ! Process data depending on representation
+
+  end subroutine process_elastic_data
+
+  !============================================================================
+  ! Subourinte to read in entire S(a,b,T) table, with a, b, and T grids
   subroutine read_s_a_b_t_table()
     use mainio
     use endf
@@ -234,10 +264,13 @@ contains
 
       !read in other lists for all temperatures
       do t_i = 2, ntemps
-        call listio(nin, 0, 0, tmp, nb, nw)
-        if (nb .ne. 0) then
-          call error('cthermr','list was not completely read','')
-        end if
+        loc = 1
+        call listio(nin, 0, 0, tmp(loc), nb, nw)
+        loc = loc + nw
+        do while (nb .ne. 0)
+          call moreio(nin, 0, 0, tmp(loc), nb, nw)
+          loc = loc + nw
+        end do
 
         if (b_i .eq. 1) then
           temps(t_i) = c1h
