@@ -10,16 +10,18 @@
 ! provided here.
 !
 ! Coherent Elastic Scattering
+! ---------------------------
 !
 ! Incoherent Elastic Scattering
 ! -----------------------------
 ! The only data required to completely describe this reaction is the list of
 ! Debye-Waller integrals at their respective temperatures ( W(T) ). From this
 ! value, the total incoherent elastic scattering cross section may be calculated
-! using Eq. 7.5 from the ENDF-6 Formats Manual. Eq. 7.4 also provides a method
-! to calculated the CDF for the scattering cosine.
+! using Eq. 7.5 from the ENDF-6 Manual. Eq. 7.4 also provides a method to
+! calculated the CDF for the scattering cosine.
 !
 ! Incoherent Inelastic Scattering
+! -------------------------------
 !
 ! Pavlou, A.T., Ji, W., 2014. On-the-fly sampling of temperature-dependent
 ! thermal neutron scattering data for Monte Carlo simulations. Ann Nucl Energy,
@@ -34,7 +36,7 @@ module cthermm
   public cthermr
 
   !-------------------------------------------------------------------
-  ! GLOBAL VARIABLES
+  ! PRIVATE MODULE VARIABLES
   !-------------------------------------------------------------------
   integer:: mat, nin, nout
   integer:: lat, lasym, lln, ns, ni, ntemps, nbetas, nalphas
@@ -64,8 +66,8 @@ contains
     ! Initialize module
     call timer(time)
     write(nsyso, '(/&
-      &'' cthermr...compute continuous temperature thermal scattering cross '',&
-      &''section data and distributions'',f8.1,''s'')') time
+      &'' cthermr...computes continuous temperature thermal scattering '',&
+      &''data'',f8.1,''s'')') time
     write(nsyse, '(/'' cthermr...'',59x,f8.1,''s'')') time
 
     ! Read in input and output tapes.
@@ -123,7 +125,7 @@ contains
     ! Keep notes as to what records are provided
     call dictio(nin,0,0,dict,nb,nw)
 
-    ! check for reaction types
+    ! check for reaction types in dictionary
     do i = 1, nxc
       if ((dict((i-1)*6 + 3) .eq. 7) .and. (dict((i-1)*6 + 4) .eq. 4)) then
           ! Check for incoherent inelastic scattering MF=7, MT=4
@@ -160,7 +162,6 @@ contains
     use mainio
     use endf
     use util
-    real(kr):: a(17)
     integer:: i, b_i, a_i, t_i, nb, nw, loc, low
     real(kr):: tmp(5*npage)
 
@@ -168,7 +169,7 @@ contains
     call findf(mat, 7, 4, nin)
 
     ! Read head
-    call contio(nin, 0, 0, a, nb, nw)
+    call contio(nin, 0, 0, tmp, nb, nw)
     lat = l2h
     lasym = n1h
 
@@ -186,7 +187,7 @@ contains
     
 
     ! Read tab2 with info on beta
-    call tab2io(nin, 0, 0, a, nb, nw)
+    call tab2io(nin, 0, 0, tmp, nb, nw)
     nbetas = n2h
     allocate(beta(nbetas))
 
@@ -202,6 +203,7 @@ contains
         allocate(temps(ntemps))
         allocate(s_a_b_t(nbetas,nalphas,ntemps))
       end if
+      ! TODO should not use such an adhoc method. Should fix one day
       if (nalphas > 2*5*npage) then
         call error('cthermr','Cant fit all alphas in tmp','')
       end if
@@ -250,11 +252,12 @@ contains
       end do
     end do
     
-    ! TODO write numbers
-    ! TODO two betas
-    ! TODO write alphas
-    ! TODO write temps
-
+    write(nsyso, '(/''Number of Beta values  : '',i4,'''')') nbetas
+    write(nsyso, '(''Number of Alpha values : '',i4,'''')') nalphas
+    write(nsyso, '(''Number of Temperatures : '',i4,'''')') ntemps
+    write(nsyso, '(/''Betas:''/6(E12.6,X))') (beta(i), i = 1, nbetas)
+    write(nsyso, '(/''Alphas:''/6(E12.6,X))') (alpha(i), i = 1, nalphas)
+    write(nsyso, '(/''Temperatures:''/6(E12.6,X))') (temps(i), i = 1, ntemps)
   end subroutine read_s_a_b_t_table
 
 end module cthermm
