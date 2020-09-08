@@ -38,13 +38,21 @@ module cthermm
   !-------------------------------------------------------------------
   ! PRIVATE MODULE VARIABLES
   !-------------------------------------------------------------------
+  ! General variables
   integer:: mat, nin, nout
-  integer:: lat, lasym, lln, ns, ni, ntemps, nbetas, nalphas
+  logical :: elastic = .false., inco_inelastic = .false.
   integer:: lthr ! Determines coherent elastic (1) or incoherent elastic (2)
+
+  ! Incoherent Inelastic Variables
+  integer:: lat, lasym, lln, ns, ni, ntemps, nbetas, nalphas
   real(kr):: b(24) ! Max len of B(N) is 24 from ENDF manual p. 151
   real(kr), dimension(:), allocatable:: alpha, beta, temps
   real(kr), dimension(:,:,:), allocatable:: s_a_b_t
-  logical :: elastic = .false., inco_inelastic = .false.
+
+  ! Incoherent Elastic Variables
+  integer:: ndwtemps, ndwinterps
+  real(kr), dimension(:,:), allocatable:: debye_waller ! (1,:) are temps, (2,:) and W(T)
+  integer, dimension(:,:), allocatable:: dw_interp ! Interpolation rules for debye_waller
 
 contains
   !============================================================================
@@ -161,12 +169,14 @@ contains
     if (allocated(beta)) deallocate(beta)
     if (allocated(temps)) deallocate(temps)
     if (allocated(s_a_b_t)) deallocate(s_a_b_t)
+    if (allocated(debye_waller)) deallocate(debye_waller)
+    if (allocated(dw_interp)) deallocate(dw_interp)
     
     ! End timer call
     call timer(time)
   end subroutine cthermr
   
-  !============================================================================
+  !=============================================================================
   ! Subroutine to determine Coherent or Incoherent Elastic
   subroutine process_elastic_data()
     use mainio
@@ -183,10 +193,84 @@ contains
     lthr = l1h
 
     ! Process data depending on representation
+    if (lthr .eq. 1) then
+
+    else if (lthr .eq. 2) then
+      call process_incoherent_elastic_data()
+    end if
 
   end subroutine process_elastic_data
+  
+  !=============================================================================
+  subroutine process_incoherent_elastic_data()
+    use mainio
+    use endf
+    use util
+    integer:: i, nb, nw, loc, low, size_tmp
+    real(kr), dimension(:), allocatable:: tmp
+    
+    write(nsyso,*) 
+    write(nsyso,*) repeat("=", 77)
+    write(nsyso, '('' Incoherent Eastic Scattering Data'')')
+    write(nsyso,*) repeat("-", 77)
 
-  !============================================================================
+    allocate(tmp(npage+50))
+
+    ! Get cont just for size
+    call contio(nin, 0, 0, tmp, nb, nw)
+    ndwtemps = n2h
+    ndwinterps = n1h
+    low = 6 + 2*ndwinterps
+
+    write(nsyso,'('' Number of Debye-Waller (T,W) pairs : ''i4'''')') ndwtemps
+    write(nsyso,'('' Number of interpolation regions    : ''i4'''')') ndwinterps
+    write(nsyso, *)
+
+
+    ! Reallocate tmp
+    size_tmp = 2*ndwtemps + low + 50
+    deallocate(tmp)
+    allocate(tmp(size_tmp))
+
+    ! Go back to beginning of record
+    call findf(mat, 7, 2, nin)
+    call contio(nin, 0, 0, tmp, nb, nw)
+    
+    ! Read in tab1
+    loc = 1
+    call tab1io(nin, 0, 0, tmp(loc), nb, nw)
+
+    ! Continue reading in tab1 if it didn't finish
+    loc = loc + nw
+    do while (nb .ne. 0)
+      call moreio(nin, 0, 0, tmp(loc), nb, nw)
+      loc = loc + nw
+    end do
+
+    ! Allocate arrays
+    allocate(debye_waller(2,ndwtemps))
+    allocate(dw_interp(2,ndwinterps))
+
+    ! Fill arrays
+    loc = 7
+    do i = 1, ndwinterps
+      dw_interp(1,i) = nint(tmp(loc))
+      dw_interp(2,i) = nint(tmp(loc + 1))
+      loc = loc + 2
+    end do
+    
+    loc = 1
+    do i = 1, ndwtemps
+      debye_waller(1,i) = tmp(low + loc)
+      debye_waller(2,i) = tmp(low + loc + 1)
+      loc = loc + 2
+    end do
+ 
+    ! Deallocate temporary storage
+    deallocate(tmp)
+  end subroutine process_incoherent_elastic_data
+
+  !=============================================================================
   ! Subourinte to read in entire S(a,b,T) table, with a, b, and T grids
   subroutine read_s_a_b_t_table()
     use mainio
@@ -195,6 +279,11 @@ contains
     integer:: i, b_i, a_i, t_i, nb, nw, loc, low
     real(kr), dimension(:), allocatable:: tmp
     integer:: size_tmp
+
+    write(nsyso,*) 
+    write(nsyso,*) repeat("=", 77)
+    write(nsyso, '('' Reading S(a,b,T) Table'')')
+    write(nsyso,*) repeat("-", 77)
     
     ! Set initial size of tmp
     size_tmp = 5*npage
@@ -330,12 +419,12 @@ contains
     if (lasym .eq. 0) call expand_s_a_b_t()
     
     ! Save meshes to output file 
-    write(nsyso, '(/''Number of Beta values  : '',i4,'''')') nbetas
-    write(nsyso, '(''Number of Alpha values : '',i4,'''')') nalphas
-    write(nsyso, '(''Number of Temperatures : '',i4,'''')') ntemps
-    write(nsyso, '(/''Betas:''/6(E12.6,X))') (beta(i), i = 1, nbetas)
-    write(nsyso, '(/''Alphas:''/6(E12.6,X))') (alpha(i), i = 1, nalphas)
-    write(nsyso, '(/''Temperatures:''/6(E12.6,X))') (temps(i), i = 1, ntemps)
+    write(nsyso, '('' Number of Beta values   : '',i4,'''')') nbetas
+    write(nsyso, '('' Number of Alpha values  : '',i4,'''')') nalphas
+    write(nsyso, '('' Number of Temperatures  : '',i4,'''')') ntemps
+    write(nsyso, '(/'' Betas:''/6(X,E12.6))') (beta(i), i = 1, nbetas)
+    write(nsyso, '(/'' Alphas:''/6(X,E12.6))') (alpha(i), i = 1, nalphas)
+    write(nsyso, '(/'' Temperatures:''/6(X,E12.6))') (temps(i), i = 1, ntemps)
   end subroutine read_s_a_b_t_table
 
   !=============================================================================
