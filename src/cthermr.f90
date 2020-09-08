@@ -42,7 +42,7 @@ module cthermm
   integer:: lat, lasym, lln, ns, ni, ntemps, nbetas, nalphas
   integer:: lthr ! Determines coherent elastic (1) or incoherent elastic (2)
   real(kr):: b(24) ! Max len of B(N) is 24 from ENDF manual p. 151
-  real(kr), dimension(:), allocatable:: alpha, beta, temps, energies
+  real(kr), dimension(:), allocatable:: alpha, beta, temps
   real(kr), dimension(:,:,:), allocatable:: s_a_b_t
 
 contains
@@ -78,7 +78,7 @@ contains
     ! file which is "self contained", and does not need to be reconstructed
     ! or Doppler broadened.
     read(nsysi,*) nin, nout, mat
-    if(nout.lt.0) call error('cthermr', 'Only ASCII output allowed.',' ')
+    if(nout < 0) call error('cthermr', 'Only ASCII output allowed.',' ')
     ! TODO write input, output, and mat to nsyso
 
     ! Open input and output files
@@ -99,13 +99,13 @@ contains
     ! Read 4 CONT records (first is a HEAD)
     do i = 1, 4
       call contio(nin,0,0,a,nb,nw)
-      if (i.eq.3) then
+      if (i /= 3) then
         nsub = n1h
       end if
     end do
 
     ! Check nsub to make sure this is a thermal scattering neutron file
-    if (nsub.ne.12) then
+    if (nsub /= 12) then
       call error('cthermr','Input tape does not contain thermal neutron scattering data','')
     end if
 
@@ -129,18 +129,17 @@ contains
 
     ! check for reaction types in dictionary
     do i = 1, nxc
-      if ((dict((i-1)*6 + 3) .eq. 7) .and. (dict((i-1)*6 + 4) .eq. 4)) then
+      if ((dict((i-1)*6 + 3) == 7) .and. (dict((i-1)*6 + 4) == 4)) then
         ! Check for incoherent inelastic scattering MF=7, MT=4. This should
         ! ALWAYS be present, but I make sure just in case.
         inco_inelastic = .true.
-      else if ((dict((i-1)*6 + 3) .eq. 7) .and. (dict((i-1)*6 + 4) .eq. 2)) then
+      else if ((dict((i-1)*6 + 3) == 7) .and. (dict((i-1)*6 + 4) == 2)) then
         ! Coherent and Incoherent elastic are both in MT=2, because there never
         ! are both present. It is only one or the other. It must be checked latter
         ! if it is Coherent or Incoherent
         elastic = .true.
       end if
     end do
-    ! TODO write which reactions are contained in file to nsyso
 
     if (elastic) then
       call process_elastic_data()
@@ -149,6 +148,9 @@ contains
     if (inco_inelastic) then
       call read_s_a_b_t_table()
     end if
+    
+    ! TODO for debuging only
+    !call write_s_a_b_t_vals()
 
     ! Read First Card
     !read(nsysi,*) mat, nfit
@@ -159,7 +161,6 @@ contains
     if (allocated(alpha)) deallocate(alpha)
     if (allocated(beta)) deallocate(beta)
     if (allocated(temps)) deallocate(temps)
-    if (allocated(energies)) deallocate(energies)
     if (allocated(s_a_b_t)) deallocate(s_a_b_t)
     
     ! End timer call
@@ -193,7 +194,13 @@ contains
     use endf
     use util
     integer:: i, b_i, a_i, t_i, nb, nw, loc, low
-    real(kr):: tmp(5*npage)
+    real(kr), dimension(:), allocatable:: tmp
+    integer:: size_tmp
+    
+    ! Set initial size of tmp
+    size_tmp = 5*npage
+    size_tmp = 50
+    allocate(tmp(size_tmp))
 
     ! Find MF 7 MT 4 in input file
     call findf(mat, 7, 4, nin)
@@ -205,7 +212,7 @@ contains
 
     ! Read list of B(N)
     call listio(nin, 0, 0, tmp, nb, nw)
-    if (nb .ne. 0) then
+    if (nb /= 0) then
       call error('cthermr','B(N) list longer than 24. Should not be possible','')
     else
       ni = n1h
@@ -215,76 +222,108 @@ contains
       end do
     end if
     
-
     ! Read tab2 with info on beta
     call tab2io(nin, 0, 0, tmp, nb, nw)
     nbetas = n2h
     allocate(beta(nbetas))
 
+    ! Read a "cont" to get nalphas and ntemps
+    ! Then can read other things again to get back to beginning of
+    ! thae tab1 for a,S
+    call contio(nin, 0, 0, tmp, nb, nw)
+    nalphas = n2h
+    ntemps = l1h + 1
+    allocate(alpha(nalphas))
+    allocate(temps(ntemps))
+    allocate(s_a_b_t(nalphas,nbetas,ntemps))
+
+    ! Where we start reading table from, due to interpolation
+    ! lists, and C1, C2, L1, L2, N1, N2
+    low = 6 + 2*n1h
+    deallocate(tmp)
+    size_tmp = (2*nalphas + low + 50)
+    allocate(tmp(size_tmp))
+
+    ! Go back to tab1
+    call findf(mat, 7, 4, nin)
+    call contio(nin, 0, 0, tmp, nb, nw)
+    call listio(nin, 0, 0, tmp, nb, nw)
+    call tab2io(nin, 0, 0, tmp, nb, nw)
+
+    !-----------------------------------------------------------------
     ! Read in data for all betas
     do b_i = 1, nbetas
+      !---------------------------------------------------------------
+      ! Read in tab1 with with (a,S(1,a,1)) pairs
       loc = 1
       call tab1io(nin, 0, 0, tmp(loc), nb, nw)
-      if(b_i .eq. 1) then
-        nalphas = n2h
-        ntemps = l1h + 1
-        low = 6 + 2*n1h
-        allocate(alpha(nalphas))
-        allocate(temps(ntemps))
-        allocate(s_a_b_t(nbetas,nalphas,ntemps))
-      end if
-      ! TODO should not use such an adhoc method. Should fix one day
-      if (nalphas > 2*5*npage) then
-        call error('cthermr','Cant fit all alphas in tmp','')
-      end if
+
+      ! Continue reading in tab1 if it didn't finish
       loc = loc + nw
-      do while (nb .ne. 0)
+      do while (nb /= 0)
         call moreio(nin, 0, 0, tmp(loc), nb, nw)
         loc = loc + nw
       end do
+
+      ! Write value of beta
       beta(b_i) = c2h
 
-      ! Assign all alphas for T0
-      a_i = 1
-      do i = 1, 2*nalphas, 2
+      ! Save all values of alpha if b_i == 1
+      ! otherwise check values of alpha for consistency.
+      ! Then save S(1,a,1) values to array.
+      i = 1
+      do a_i = 1, nalphas
         ! Only save alphas for first run
         if (b_i .eq. 1) then
           alpha(a_i) = tmp(low+i)
           temps(1) = c1h
+        ! Otherwise check alphas for consistency
         else
-          if(alpha(a_i) .ne. tmp(low+i)) &
-            & call error('cthermr','Apha dissagrement','')
+          if(alpha(a_i) /= tmp(low+i)) then
+            write(*,*) low+i, i, a_i, alpha(a_i), tmp(low+i)
+            call error('cthermr','Alpha dissagrement','')
+          end if
 
-          if(temps(1) .ne. c1h) &
+          if(temps(1) /= c1h) &
             & call error('cthermr','Temperature dissagrement','')
         end if
-        s_a_b_t(b_i, a_i, 1) = tmp(low+i+1)
-        a_i = a_i + 1
+        s_a_b_t(a_i, b_i, 1) = tmp(low+i+1)
+        i = i + 2
       end do
-
+      !---------------------------------------------------------------
+      
+      
+      !---------------------------------------------------------------
       !read in other lists for all temperatures
       do t_i = 2, ntemps
+        ! Read entire list with S(b_i,:,t_i) values
         loc = 1
         call listio(nin, 0, 0, tmp(loc), nb, nw)
         loc = loc + nw
-        do while (nb .ne. 0)
+        do while (nb /= 0)
           call moreio(nin, 0, 0, tmp(loc), nb, nw)
           loc = loc + nw
         end do
-
-        if (b_i .eq. 1) then
+        
+        ! Save value of temperature on first run
+        if (b_i == 1) then
           temps(t_i) = c1h
+        ! Check temperature otherwise
         else
-          if(temps(t_i) .ne. c1h) &
+          if(temps(t_i) == c1h) &
             & call error('cthermr','Temperature dissagrement','')
         endif
-
+        
+        ! Save all values to table
         do a_i = 1, nalphas
-          s_a_b_t(b_i, a_i, t_i) = tmp(6+a_i)
+          s_a_b_t(a_i, b_i, t_i) = tmp(6+a_i)
         end do
       end do
+      !---------------------------------------------------------------
     end do
+    !-----------------------------------------------------------------
     
+    ! Save meshes to output file 
     write(nsyso, '(/''Number of Beta values  : '',i4,'''')') nbetas
     write(nsyso, '(''Number of Alpha values : '',i4,'''')') nalphas
     write(nsyso, '(''Number of Temperatures : '',i4,'''')') ntemps
@@ -292,5 +331,33 @@ contains
     write(nsyso, '(/''Alphas:''/6(E12.6,X))') (alpha(i), i = 1, nalphas)
     write(nsyso, '(/''Temperatures:''/6(E12.6,X))') (temps(i), i = 1, ntemps)
   end subroutine read_s_a_b_t_table
+  
+  
+  !=============================================================================
+  subroutine write_s_a_b_t_vals()
+    integer:: b, a, t
+    real(kr):: alph, bet, tmp
+    logical:: write_vals = .true.
+
+    do while(write_vals)
+      write(*,*) 'Enter b, a, t'
+      read(*,*) b, a, t
+
+      if ((a > nalphas) .or. (b > nbetas) .or. (t > ntemps)) then
+        write(*,*) 'Indicies out of range.../'
+      else if ((a <= 0) .or. (b <= 0) .or. (t <= 0)) then
+        write(*,*) 'Exiting...'
+        write_vals = .false.
+      else
+        alph = alpha(a)
+        bet = beta(b)
+        tmp = temps(t)
+        write(*, '(/''Beta = '',E12.6,'''')') bet
+        write(*, '(''Alpha = '',E12.6,'''')') alph
+        write(*, '(''Temperature = '',E12.6,'''')') tmp
+        write(*, '(''S(a,b,T) = '',E12.6,''''/)') s_a_b_t(a,b,t)
+      end if
+    end do
+  end subroutine write_s_a_b_t_vals
 
 end module cthermm
