@@ -44,6 +44,7 @@ module cthermm
   real(kr):: b(24) ! Max len of B(N) is 24 from ENDF manual p. 151
   real(kr), dimension(:), allocatable:: alpha, beta, temps
   real(kr), dimension(:,:,:), allocatable:: s_a_b_t
+  logical :: elastic = .false., inco_inelastic = .false.
 
 contains
   !============================================================================
@@ -62,9 +63,7 @@ contains
     integer:: nwd, nxc, nsub ! Numbers from ENDF format
     integer:: i, nb, nw ! nb and nw from NJOY dev info in manual
     real(kr), dimension(:), allocatable:: dict
-    logical :: elastic = .false., inco_inelastic = .false.
     
-
     ! Initialize module
     call timer(time)
     write(nsyso, '(/&
@@ -78,7 +77,7 @@ contains
     ! file which is "self contained", and does not need to be reconstructed
     ! or Doppler broadened.
     read(nsysi,*) nin, nout, mat
-    if(nout < 0) call error('cthermr', 'Only ASCII output allowed.',' ')
+    if(nout .lt. 0) call error('cthermr', 'Only ASCII output allowed.',' ')
     ! TODO write input, output, and mat to nsyso
 
     ! Open input and output files
@@ -99,13 +98,13 @@ contains
     ! Read 4 CONT records (first is a HEAD)
     do i = 1, 4
       call contio(nin,0,0,a,nb,nw)
-      if (i /= 3) then
+      if (i .eq. 3) then
         nsub = n1h
       end if
     end do
 
     ! Check nsub to make sure this is a thermal scattering neutron file
-    if (nsub /= 12) then
+    if (nsub .ne. 12) then
       call error('cthermr','Input tape does not contain thermal neutron scattering data','')
     end if
 
@@ -129,11 +128,11 @@ contains
 
     ! check for reaction types in dictionary
     do i = 1, nxc
-      if ((dict((i-1)*6 + 3) == 7) .and. (dict((i-1)*6 + 4) == 4)) then
+      if ((dict((i-1)*6 + 3) .eq. 7) .and. (dict((i-1)*6 + 4) .eq. 4)) then
         ! Check for incoherent inelastic scattering MF=7, MT=4. This should
         ! ALWAYS be present, but I make sure just in case.
         inco_inelastic = .true.
-      else if ((dict((i-1)*6 + 3) == 7) .and. (dict((i-1)*6 + 4) == 2)) then
+      else if ((dict((i-1)*6 + 3) .eq. 7) .and. (dict((i-1)*6 + 4) .eq. 2)) then
         ! Coherent and Incoherent elastic are both in MT=2, because there never
         ! are both present. It is only one or the other. It must be checked latter
         ! if it is Coherent or Incoherent
@@ -212,11 +211,12 @@ contains
 
     ! Read list of B(N)
     call listio(nin, 0, 0, tmp, nb, nw)
-    if (nb /= 0) then
+    if (nb .ne. 0) then
       call error('cthermr','B(N) list longer than 24. Should not be possible','')
     else
       ni = n1h
       ns = n2h
+      lln = l1h
       do i = 1, ni
         b(i) = tmp(6+i)
       end do
@@ -260,7 +260,7 @@ contains
 
       ! Continue reading in tab1 if it didn't finish
       loc = loc + nw
-      do while (nb /= 0)
+      do while (nb .ne. 0)
         call moreio(nin, 0, 0, tmp(loc), nb, nw)
         loc = loc + nw
       end do
@@ -279,12 +279,12 @@ contains
           temps(1) = c1h
         ! Otherwise check alphas for consistency
         else
-          if(alpha(a_i) /= tmp(low+i)) then
+          if(alpha(a_i) .ne. tmp(low+i)) then
             write(*,*) low+i, i, a_i, alpha(a_i), tmp(low+i)
             call error('cthermr','Alpha dissagrement','')
           end if
 
-          if(temps(1) /= c1h) &
+          if(temps(1) .ne. c1h) &
             & call error('cthermr','Temperature dissagrement','')
         end if
         s_a_b_t(a_i, b_i, 1) = tmp(low+i+1)
@@ -300,17 +300,17 @@ contains
         loc = 1
         call listio(nin, 0, 0, tmp(loc), nb, nw)
         loc = loc + nw
-        do while (nb /= 0)
+        do while (nb .ne. 0)
           call moreio(nin, 0, 0, tmp(loc), nb, nw)
           loc = loc + nw
         end do
         
         ! Save value of temperature on first run
-        if (b_i == 1) then
+        if (b_i .eq. 1) then
           temps(t_i) = c1h
         ! Check temperature otherwise
         else
-          if(temps(t_i) == c1h) &
+          if(temps(t_i) .ne. c1h) &
             & call error('cthermr','Temperature dissagrement','')
         endif
         
@@ -322,6 +322,12 @@ contains
       !---------------------------------------------------------------
     end do
     !-----------------------------------------------------------------
+
+    ! If ln(S(a,b,t)) was sotred, exponentiate to recover S()
+    if (lln .eq. 1) s_a_b_t = exp(s_a_b_t)
+
+    ! If symmetric, expand S(a,b,T) to full domain of Beta
+    if (lasym .eq. 0) call expand_s_a_b_t()
     
     ! Save meshes to output file 
     write(nsyso, '(/''Number of Beta values  : '',i4,'''')') nbetas
@@ -331,7 +337,65 @@ contains
     write(nsyso, '(/''Alphas:''/6(E12.6,X))') (alpha(i), i = 1, nalphas)
     write(nsyso, '(/''Temperatures:''/6(E12.6,X))') (temps(i), i = 1, ntemps)
   end subroutine read_s_a_b_t_table
-  
+
+  !=============================================================================
+  ! S(a,b,T) is usually symmetric about Beta, and is therefore stored in ENDF
+  ! files without the negative Beta values. To facilitate a simpler numeric
+  ! integration, this subroutine expands the table so that the full range of
+  ! values in Beta are provided.
+  subroutine expand_s_a_b_t()
+    integer:: i, b_i, a_i, t_i, new_nbetas
+    real(kr), dimension(:), allocatable :: tmp_beta
+    real(kr), dimension(:,:,:), allocatable :: tmp_s
+
+    ! Store current s_a_b_t into tmp_s, and beta into tmp_beta
+    allocate(tmp_s(nalphas, nbetas, ntemps))
+    allocate(tmp_beta(nbetas))
+    do a_i = 1, nalphas
+      do b_i = 1, nbetas
+        do t_i = 1, ntemps
+          tmp_s(a_i, b_i, t_i) = s_a_b_t(a_i, b_i, t_i)
+        end do
+        tmp_beta(b_i) = beta(b_i)
+      end do
+    end do
+
+    ! Reallocate previous s_a_b_t, and beta
+    new_nbetas = 2*nbetas - 1
+    deallocate(s_a_b_t)
+    deallocate(beta)
+    allocate(s_a_b_t(nalphas, new_nbetas, ntemps))
+    allocate(beta(new_nbetas))
+
+    ! Refill beta and s_a_b_t
+    i = 1
+    do b_i = nbetas, 2, -1
+      beta(i) = - tmp_beta(b_i)
+      do a_i = 1, nalphas
+        do t_i = 1, ntemps
+          s_a_b_t(a_i, i, t_i) = tmp_s(a_i, b_i, t_i)
+        end do
+      end do
+      i = i + 1
+    end do
+    
+    do b_i = 1, nbetas
+      beta(i) = tmp_beta(b_i)
+      do a_i = 1, nalphas
+        do t_i = 1, ntemps
+          s_a_b_t(a_i, i, t_i) = tmp_s(a_i, b_i, t_i)
+        end do
+      end do
+      i = i + 1
+    end do
+
+    nbetas = new_nbetas
+
+    ! Deallocate temporary arrays
+    deallocate(tmp_beta)
+    deallocate(tmp_s)
+  end subroutine expand_s_a_b_t
+
   
   !=============================================================================
   subroutine write_s_a_b_t_vals()
@@ -343,9 +407,9 @@ contains
       write(*,*) 'Enter b, a, t'
       read(*,*) b, a, t
 
-      if ((a > nalphas) .or. (b > nbetas) .or. (t > ntemps)) then
+      if ((a .gt. nalphas) .or. (b .gt. nbetas) .or. (t .gt. ntemps)) then
         write(*,*) 'Indicies out of range.../'
-      else if ((a <= 0) .or. (b <= 0) .or. (t <= 0)) then
+      else if ((a .le. 0) .or. (b .le. 0) .or. (t .le. 0)) then
         write(*,*) 'Exiting...'
         write_vals = .false.
       else
