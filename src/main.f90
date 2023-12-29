@@ -28,6 +28,10 @@ program njoy
 !          point-to-point scattering kernels in the thermal range for
 !          free or bound atoms.
 !
+! reskr....generate resonance elastic scattering kernels for
+!          anisotropic scattering up to any Legendre order, used to
+!          represent exact Doppler broadened energy transfer kernels.
+!
 ! groupr...generate self-shielded multigroup cross sections and
 !          group-to-group scattering and photon production matrices.
 !
@@ -49,6 +53,12 @@ program njoy
 !
 ! matxsr...convert multigroup data into the comprehensive MATXS
 !          cross section interface format.
+!
+! dragr....generates a draglib interface file for the Dragon lattice
+!          physics code.
+!
+! electr...generates multigroup electron interaction cross sections,
+!          energy and charge deposition factors.
 !
 ! resxsr...prepare a CCCC-like file of pointwise resonance
 !          cross sections for thermal flux calculations.
@@ -120,6 +130,7 @@ program njoy
    use unresm  ! provides unresr
    use heatm   ! provides heatr
    use thermm  ! provides thermr
+   use reskm   ! provides reskr
    use groupm  ! provides groupr
    use gaminm  ! provides gaminr
    use errorm  ! provides errorr
@@ -128,6 +139,8 @@ program njoy
    use dtfm    ! provides dtfr
    use ccccm   ! provides ccccr
    use matxsm  ! provides matxsr
+   use dragm   ! provides dragr
+   use electm  ! provides electr
    use resxsm  ! provides resxsr
    use acem    ! provides acer
    use powm    ! provides powr
@@ -260,6 +273,15 @@ program njoy
 
       case('gaspr')  ! add gas production (mt203-207) to pendf
          call gaspr
+
+      case('dragr')  ! produce draglib file
+         call dragr
+
+      case('electr') ! produce multigroup electron data
+         call electr
+
+      case('reskr') ! generate resonant free-gas scattering kernels
+         call reskr
 
       case ('--')    ! comment card; nothing to do
 
