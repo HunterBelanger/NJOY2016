@@ -1,0 +1,319 @@
+\section{RESKR}
+\label{sRESKR}
+
+\hypertarget{sRESKRhy}{The}
+RESKR\index{RESKR|textbf} module of NJOY generates
+Doppler-broadened\index{Doppler-broadening} resonance elastic scattering
+kernels (RESKs) in PENDF\index{PENDF} format starting from piecewise linear
+cross sections in PENDF format.  The input cross sections are recovered from
+\hyperlink{sRECONRhy}{RECONR}\index{RECONR} {\sl and} from a previous
+\hyperlink{sBROADRhy}{BROADR}\index{BROADR} run. The code is based on
+the RESK\cite{RESK}\index{RESK} module in the ATLAS nuclear data processing
+code\cite{ATLAS}\index{ATLAS} by J. Xu, T. Zu and L. Cao.
+
+The exact Doppler broadened energy transfer kernel produces a strong
+up-scattering effect in the resolved resonance energy range, above the
+upper limit where the $S(\alpha,\beta)$ free gas model of the
+\hyperlink{sTHERMRhy}{THERMR}\index{THERMR} module is set. The RESKR module
+is used to pursue Doppler broadening of the elastic kernel for resonant
+nuclides above the thermal domain considered by THERMR.
+
+The RESKR module implements the Blackshaw-Murray\cite{BLACKSHAW} elastic
+kernel to represent the effect of neutron up-scattering caused by thermal
+motion of target nuclei and resonance elastic scattering on the multigroup
+scattering matrices. Firstly, the resonance elastic scattering kernel (RESK)
+formulations for anisotropic scattering up to any Legendre order is adopted
+to represent the exact Doppler broadened energy transfer kernels. A
+semi-analytical integration method is applied to perform the RESK
+calculations. Combining with the RESK calculations, a linearization
+algorithm is proposed to generate the RESK interpolation tables. These
+interpolation tables are Legendre moments $\ell$ of the elastic scattering
+kernels of the form $P_\ell(E \rightarrow E')$. They are written in the
+output PENDF file as a new {\tt MF6 MT300} reaction type.
+
+This report describes the RESKR module in NJOY 2012.0.
+
+\subsection{The Resonance Elaslic Scattering Kernel Theory}
+\label{ssRESKR_theory}
+
+The effective cross section for a material at temperature $T$ is defined
+to be that differential cross section that gives the same reaction rate
+for stationary target nuclei as the real differential cross section gives
+for moving nuclei. Therefore,
+\begin{equation}
+  v {\overline \sigma}(v,T)=
+    \int d^3V \, |{\bf v}-{\bf V}|\,\sigma_{\rm s}(|{\bf v}-{\bf V}|) \,
+    P{\rm s}({\bf v},{\bf V} \rightarrow {\bf v}') \,P({\bf V},T)\,\,,
+\label{resk1}
+\end{equation}
+\noindent where
+\begin{description}
+\item [${\bf v}$ =] velocity of the incident neutron in LAB with $v=|{\bf v}|$
+\item [${\bf V}$ =] velocity of the nucleus target in LAB
+\item [${\bf v}'$ =] velocity of the scattered neutron in LAB
+\item [$\sigma_{\rm s}$ =] scattering cross section in LAB
+\item [$P_{\rm s}({\bf v},{\bf V} \rightarrow {\bf v}')$ =] elastic kernel
+in LAB
+\item [$P({\bf V},T)$ =] distribution of target velocities in LAB.
+\end{description}
+
+The elastic kernel in the CM for an isotropic collision in the CM is
+written\cite{OUISLOUMEN}
+\begin{equation}
+P_{\rm s}({\bf u} \rightarrow {\bf u}')={\delta(u-u')\over 2u^2}
+\label{resk2}
+\end{equation}
+\noindent where
+\begin{description}
+\item [${\bf u}$ =] velocity of the incident neutron in CM with $u=|{\bf u}|$
+\item [${\bf u}'$ =] velocity of the scattered neutron in CM with
+$u'=|{\bf u}'|$.
+\end{description}
+
+For many cases of interest, the target motion is isotropic and the
+distribution of velocities can be described by the
+Maxwell-Boltzmann\index{Maxwell-Boltzmann function} distribution
+\begin{equation}
+  P({\bf V},T)\,d^3V=
+    {{\alpha^{3/2}} \over {\pi^{3/2}}} \exp (-\alpha {V}^2)\, d^3V\,\,,
+\label{resk3}
+\end{equation}
+where $\alpha=M/(2kT)$, $k$ is Boltzmann's constant\index{Boltzmann
+constant}, and $M$ is the target mass.
+
+The general expression for the effective transfer elastic cross section
+of an isotropic medium with a Maxwell-Boltzmann velocity distribution can
+be obtained as\cite{OUISLOUMEN}
+\begin{equation}
+\sigma_{{\rm s},\ell}(E\rightarrow E')={\beta^{5/2}\over 4E} \,
+\exp\left({E\over kT}\right) \int_0^\infty dt \, t \, \sigma_{\rm s}
+\left({kT\over A}\, t^2\right) \exp\left({-t^2\over A}\right) \psi_\ell(t)
+\label{resk4}
+\end{equation}
+\noindent where
+\begin{description}
+\item [$\ell$ =] Legendre moment ($=0$ for the isotropic component in LAB)
+\item [$A$ =] mass of the nucleus in unit of neutron mass
+\item [$\beta$ =] $(A+1)/A$
+\item [$\sigma_{\rm s}$ =] energy-dependent 0K cross section as recovered
+from input PENDF tape,
+\end{description}
+
+\noindent and where we used the integration variable $t$ as a non-dimensional
+expression of the neutron velocity $u$ in CM:
+\begin{equation}
+t=u\, \sqrt{m(A+1)\over 2kT}
+\label{resk5}
+\end{equation}
+
+\noindent so that the kinetic energy available to excite the compound nucleus
+in LAB is written
+\begin{equation}
+E_{\rm exc}={1\over 2} {mA\over A+1} V_{\rm r}^2={kT\over A}\, t^2
+\label{resk6}
+\end{equation}
+\noindent where $V_{\rm r}=|{\bf v}-{\bf V}|$ is the velocity of the neutron
+relative to the nucleus in LAB.
+
+The function $\psi_\ell(t)$ can be evaluated numerically as described in
+Ref.~\cite{RESK}. For the case where the collision is isotropic in CM,
+and for Legendre orders $\le 1$, analytical expressions are available as
+\begin{eqnarray}
+\nonumber \psi_0(t) \negthinspace&=& \negthinspace{\cal H}(t_+ -t)
+{\cal H}(t_- -t)\left[{\rm erf}(t+\epsilon_{\rm min})
+-{\rm erf}(\epsilon_{\rm max} -t)\right] \\
+&+& \negthinspace {\cal H} (t - t_+)\left[{\rm erf}
+(t + \epsilon_{\rm min}) - {\rm erf}(t - \epsilon_{\rm min})\right]
+\label{resk7}
+\end{eqnarray}
+
+\noindent and
+\begin{eqnarray}
+\nonumber \psi_1(t)\negthinspace&=& \negthinspace{1\over 4 \sqrt{\pi}
+\epsilon_{\rm max} \epsilon_{\rm min}} \Big[\rho \, \psi_0(t) \\
+\nonumber &-& \negthinspace {\cal H}(t_+ - t){\cal H}(t - t_-)
+\big( g(\epsilon_{\rm min},\epsilon_{\rm max})+
+j(\epsilon_{\rm max},\epsilon_{\rm min})\big) \\
+&-& \negthinspace {\cal H}(t - t_+)
+\big( (g(\epsilon_{\rm min}, \epsilon_{\rm max})-
+j(\epsilon_{\rm min},\epsilon_{\rm max})\big)\Big]
+\label{resk8}
+\end{eqnarray}
+
+\noindent where ${\cal H}(t)$ is the Heaviside step function and where
+\begin{equation}
+\epsilon_{\rm max}=\sqrt{(A+1)\max(E,E')\over kT}\, ,
+\label{resk9}
+\end{equation}
+
+\begin{equation}
+\epsilon_{\rm min}=\sqrt{(A+1)\min(E,E')\over kT}\, ,
+\label{resk10}
+\end{equation}
+
+\begin{equation}
+t_\pm={\epsilon_{\rm max}\pm \epsilon_{\rm min}\over 2}\, ,
+\label{resk11}
+\end{equation}
+
+\begin{equation}
+\rho=\sqrt{\pi} \left[\epsilon_{\rm max}^2 +\epsilon_{\rm min}^2 -2t^2
++{1\over 2} -2(\epsilon_{\rm max}^2 -t^2)(\epsilon_{\rm min}^2-t^2)]\right]\, ,
+\label{resk12}
+\end{equation}
+
+\begin{equation}
+g(x,y)=\exp\left[-(t+x)^2\right] \big[ t + x - 2(y^2 - t^2)(t-x)\big]
+\label{resk13}
+\end{equation}
+
+\noindent and
+\begin{equation}
+j(x,y) = \exp\left[-(t-x)^2\right] \big[t - x - 2(y^2 - t^2)(t+x)\big] \, .
+\label{resk14}
+\end{equation}
+
+\subsection{Coding Details}
+\label{ssRESKR_details}
+
+The main entry point is subroutine \cword{reskr} exported by module
+\cword{reskm}\index{modules!reskm@{\ty reskm}}. The code begins by
+reading the user's input (see Section~\ref{ssRESKR_UserInp}). The coding
+logic of module \cword{reskm} is similar to the one used by module
+\cword{thermm}\index{modules!thermm@{\ty thermm}}.
+
+An unassigned reaction type number \cword{MT300} in ENDF-6 format is assigned
+to store and output the interpolation table of the RESK data and the
+\cword{MF3 MT300} and \cword{MF6 MT300} reaction types are defined. The
+incident energy grid of reaction \cword{MF3 MT300} is a subset of the energy grid
+in \cword{MF3 MT2} selected between lower (\cword{elo}) and upper (\cword{ehi})
+incident energy boundaries for the RESK calculation. The incident energy grid
+of reaction \cword{MF6 MT300} is a coarser grid set to reduce computing cost.
+
+At each reconstructed incident energy, the moments of energy transfer
+kernels for the different orders are linearized simultaneously on a
+single unionized grid by the conventional interval-halving techniques
+of Cullen\cite{SIGMA1}. It ensures that all orders of the moments are
+reconstructed smoothly. Meanwhile, the moments of energy transfer kernels
+for the different orders are interpolated simultaneously once the
+interpolation interval is found.
+
+A data structure in ENDF-6 format is defined as described in
+Table~\ref{reskr_tab1} where \cword{HEAD}, \cword{TAB2}, \cword{TAB1} and
+\cword{LIST} are the standard types of records; \cword{ZA} and \cword{AWR}
+are the standard material charge and mass parameters; \cword{NL} is the
+maximum Legendre order number of this table; \cword{T} is the absolute
+temperature; \cword{E1} is the primary energy; \cword{EP} is the secondary
+energy; \cword{P0} indicates the 0th moment of energy transfer kernel and
+\cword{P1} represents the 1st moment of energy transfer kernel. The
+\cword{TAB1} structure with embedded \cword{LIST} structures is repeated
+for all \cword{NE} incident energies. Each \cword{TAB1} structure contains
+\cword{NL}$-1$ embedded \cword{LIST} structures containing kernel values for
+$P_1$, $P_2$ and higher Legendre moments.
+
+\begin{table}[t]
+\caption[MF6 MT300 reaction type.]{MF6 MT300 reaction type.}
+\begin{center}
+\begin{BVerbatim}
+[MAT, 6, MT / ZA, AWR, NL, 0, 0, 0 ] HEAD
+[MAT, 6, MT / T, 0.0, 0, 0, NR, NE / (INT) ] TAB2
+[MAT, 6, MT / 0.0, E1, 0, 0, NRP, NEP / EP / P0(E1->EP) ] TAB1
+[MAT, 6, MT / 0.0, 0.0, 0, 0, NW, 0 / P1(E1->EP) ] LIST
+Repeat the LIST structure for all NL-1 orders
+Repeat the TAB1 structure for all NE incident energies
+\end{BVerbatim}
+\label{reskr_tab1}
+\end{center}
+\end{table}
+
+After the processing, the data will be output into derived files which are the
+point-ENDF (PENDF) files. The reusable PENDF files can be used for generating
+the different multi-group cross sections and scattering matrices faced with
+the different requirements of dilutions and energy group structures.
+
+\subsection{User Input}
+\label{ssRESKR_UserInp}
+
+The following description of the user input is reproduced from
+the comment cards at the beginning of the RESKR module.
+\index{RESKR!RESKR input}
+\index{input!RESKR}
+
+\small
+\begin{ccode}
+
+    !---input specifications (free format)---------------------------
+    !
+    ! card 1
+    !    nin1     input pendf tape containing 0K data
+    !    nin2     input pendf tape containing Doppler broadened data
+    !    nout     output pendf tape
+    ! card 2
+    !    mat1     material to broadened
+    !    ntemp2   number of final temperatures (default=1)
+    ! card 3
+    !    elo      lower incident energy boundary for the RESK calculation
+    !    ehi      upper incident energy boundary for the RESK calculation
+    !    lord     maximum legendre order
+    ! card 4
+    !    temp2    final temperatures (deg Kelvin)
+    ! card 5
+    !    mat1     next MAT number to be processed with these
+    !             parameters. Terminate with mat1=0.
+    !
+    !-------------------------------------------------------------------
+
+\end{ccode}
+\normalsize
+
+Material numbers (\cword{matb}) are simply the isotopic {\tt ZA} parameter
+for ENDF evaluations; they are equal to $100{*}Z$ and two last digits function
+of $A$ for ENDF$\ge$6 formatted files.
+
+The following sample run prepares a PENDF tape for uranium-238.
+The numbers on the left are for reference; they are not part of the input.
+
+\small
+\begin{ccode}
+
+  1.   reconr
+  2.   20 -21
+  3.   reconr
+  4.   -21 -22
+  5.   'pendf tape from /tmp/u238_b7r1'/
+  6.   9237 1/
+  7.   0.001  0.  0.005/
+  8.   'U238 from /tmp/u238_b7r1 at Wed May 26 11:03:52 2021' /
+  9.   0/
+ 10.   moder
+ 11.   -22 31
+ 12.   broadr
+ 13.   -21 -22 -23
+ 14.   9237 2/
+ 15.   0.001/
+ 16.   900.0 2000.0/
+ 17.   0/
+ 18.   moder
+ 19.   -23 32
+ 20.   reskr
+ 21.   31 32 33
+ 22.   9237 2/
+ 23.   4.0 100.0 1
+ 24.   900.0 2000.0/
+ 25.   0/
+
+\end{ccode}
+\normalsize
+
+Two PENDF tapes are produced before calling RESKR: the first, on unit 31, for
+a nucleus at 0K and the second, on unit 32, containing broadened data. Next,
+module RESKR is called for broadening the elastic scattering kernel between
+4 and 100 eV and 2 Legendre orders. The output PENDF tape is recovered on unit
+33.
+
+\subsection{I/O Units}
+\label{ssRESKR_IO}
+
+There are no scratch files used in RESKR.
+
+\cleardoublepage
