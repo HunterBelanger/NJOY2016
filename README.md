@@ -72,6 +72,9 @@ make -j8
 +  `PURR` generates unresolved-resonance probability tables for use in representing resonance self-shielding effects in the MCNP Monte Carlo code.
 +  `LEAPR` generates ENDF scattering-law files (File 7) for moderator materials in the thermal range. These scattering-law files can be used by `THERMR` to produce the corresponding cross sections.
 +  `GASPR` generates gas-production cross sections in pointwise format from basic reaction data in an ENDF evaluation. These results can be converted to multigroup form using `GROUPR`, passed to `ACER`, or displayed using `PLOTR`.
++  `DRAGR` prepares DRAGLIB multigroup libraries for the Dragon lattice physics code - from Dragon's PyNjoy2012.
++  `ELECTR` prepares multigroup data for electron transport - from Dragon's PyNJOY2012.
++  `RESKR` generates Doppler broadened elastic scattering kernels for resonant isotopes - from Dragon's PyNjoy2012.
 
 ## License and Copyright
 This software is distributed and copyrighted according to the [LICENSE](LICENSE) file.

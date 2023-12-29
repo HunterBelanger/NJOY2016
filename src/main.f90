@@ -280,7 +280,7 @@ program njoy
       case('electr') ! produce multigroup electron data
          call electr
 
-      case('reskr') ! generate resonant free-gas scattering kernels
+      case('reskr') ! generate resonant elasstic scattering kernels
          call reskr
 
       case ('--')    ! comment card; nothing to do
