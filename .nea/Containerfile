@@ -1,4 +1,4 @@
-FROM docker.oecd-nea.org/hart_s/njoy2016/base:latest
+FROM docker.oecd-nea.org/njoy/njoy2016/base:latest
 COPY . njoy
 WORKDIR njoy
 RUN mkdir -p build
