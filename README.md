@@ -35,6 +35,11 @@ cmake -DCMAKE_BUILD_TYPE=Release ../
 make -j8
 ```
 
+To force using gfortran, you may replace the cmake line with
+```
+cmake -DCMAKE_Fortran_COMPILER=gfortran -DCMAKE_BUILD_TYPE=Release ../
+```
+
 The above instructions will produce a release build consisting of a dynamic library and dynamically linked executable. To compile a static version (i.e. the executable is not a dynamically linked executable), the cmake command shown above should be replaced with the following cmake command:
 ```
 cmake -DCMAKE_BUILD_TYPE=Release -Dstatic_libraries=ON
@@ -45,6 +50,16 @@ When you have already cloned the NJOY2016 repository and wish to update to the l
 ```
 git pull
 make -j8
+```
+
+You can run all tests using
+```
+make test
+```
+
+You can run a single test using
+```
+ctest -R Test14 -V
 ```
 
 ## Module overview
@@ -72,6 +87,7 @@ make -j8
 +  `PURR` generates unresolved-resonance probability tables for use in representing resonance self-shielding effects in the MCNP Monte Carlo code.
 +  `LEAPR` generates ENDF scattering-law files (File 7) for moderator materials in the thermal range. These scattering-law files can be used by `THERMR` to produce the corresponding cross sections.
 +  `GASPR` generates gas-production cross sections in pointwise format from basic reaction data in an ENDF evaluation. These results can be converted to multigroup form using `GROUPR`, passed to `ACER`, or displayed using `PLOTR`.
++  `DRAGR` generates a Draglib-formatted cross-section library for the lattice code DRAGON.
 
 ## License and Copyright
 This software is distributed and copyrighted according to the [LICENSE](LICENSE) file.

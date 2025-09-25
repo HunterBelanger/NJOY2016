@@ -77,6 +77,9 @@ program njoy
 !
 ! gaspr....add gas production (MT203-207) to PENDF tape.
 !
+! dragr....convert multigroup data into libraries for the lattice
+!          code Dragon.
+!
 ! Each processing module is implemented as a Fortran-90 module with
 ! only one public subroutine named as above.  The modules have the
 ! names as given above with "m" instead of "r".  Processing modules
@@ -138,6 +141,7 @@ program njoy
    use purm    ! provides purr
    use leapm   ! provides leapr
    use gaspm   ! provides gaspr
+   use dragm   ! provides dragr
 
    implicit none
    character(6)::module
@@ -260,6 +264,9 @@ program njoy
 
       case('gaspr')  ! add gas production (mt203-207) to pendf
          call gaspr
+
+      case('dragr')  ! produce libraries for Dragon
+         call dragr
 
       case ('--')    ! comment card; nothing to do
 
