@@ -1,2 +1,4 @@
-FROM alpine:latest
-RUN apk add --no-cache cmake g++ gfortran python3 git make
+FROM ubuntu:24.04
+RUN apt update
+RUN apt upgrade -y
+RUN DEBIAN_FRONTEND=noninteractive apt install -y cmake g++ gfortran python3 git ghostscript make
