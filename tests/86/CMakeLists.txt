@@ -41,5 +41,5 @@ configure_file("${RESOURCES}/decay-ENDF8.0.endf"
                "${CMAKE_CURRENT_BINARY_DIR}/tape51" COPYONLY )
 
 add_test( NAME "Test86"
-          COMMAND ${PYTHON_EXECUTABLE} "../execute.py"
+          COMMAND ${Python3_EXECUTABLE} "../execute.py"
           WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" )
