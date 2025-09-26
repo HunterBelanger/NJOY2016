@@ -829,6 +829,8 @@ contains
      ! ***loop over the vector cross section sets.
      lkerma=.false.
      lfiss=.false.
+     igfirs(:maxnl)=0
+     iglast(:maxnl)=0
      do ied=1,maxedi
        !  ***process x-sections for reaction malist(ied).
        call fvect(maxgr,maxnl,maxnz,ngen,matno,malist(ied),ytemp,ng0, &
