@@ -37,8 +37,14 @@ configure_file("${RESOURCES}/n-047_Ag_109-ENDF8.0.endf"
 configure_file("${RESOURCES}/nfy-ENDF8.0.endf"
                "${CMAKE_CURRENT_BINARY_DIR}/tape50" COPYONLY )
 
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/referenceTape25"
+               "${CMAKE_CURRENT_BINARY_DIR}/referenceTape25" COPYONLY )
+
 configure_file("${RESOURCES}/decay-ENDF8.0.endf"
                "${CMAKE_CURRENT_BINARY_DIR}/tape51" COPYONLY )
+
+configure_file("${RESOURCES}/n-072_Hf_177-TENDL2021.endf"
+               "${CMAKE_CURRENT_BINARY_DIR}/tape20" COPYONLY )
 
 add_test( NAME "Test86"
           COMMAND ${Python3_EXECUTABLE} "../execute.py"
