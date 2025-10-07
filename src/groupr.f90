@@ -173,6 +173,7 @@ contains
    !    fehi    break between computed flux and bondarenko flux
    !            (must be in the resolved resonance range)
    !    sigpot  estimate of potential scattering cross section
+   !            (set to 0. to recover a value from endf evaluation)
    !    nflmax  maximum number of computed flux points
    !    ninwt   tape unit for new flux parameters (default=0)
    !            note: weighting flux file is always written binary
@@ -4889,8 +4890,13 @@ contains
    !-------------------------------------------------------------------
    use mainio ! provides nsyso
    use util   ! provides error
+   use endf   ! provides endf routines and variables
+   use physics! provides pi
    ! internals
    integer::iwtt,i,nr,np,ntmp,iw
+   integer::ie,imf,ns,ner,nis,nrr(10),nb,nw
+   real(kr)::ehi,abnsu,api,apmat,aw,eur,za0,ehigh(10,30),&
+   & abni(10),zai(10),awi(10),ap(10,30),rrf(10,30)
    real(kr)::eb,tb,ec,tc,ab,ac
    real(kr),dimension(:),allocatable::tmp
    real(kr),dimension(92),parameter::w1=(/&
@@ -4987,6 +4993,32 @@ contains
         alpha2,sam,beta,alpha3,gamma
       ninwt=iabs(ninwt)
       call openz(-ninwt,1)
+      !
+      ! Process Evaluated Nuclear Data Library
+      if(sigpot == 0.) then
+        ntmp=10000
+        allocate(tmp(ntmp))
+        call openz(nendf,0)
+        call repoz(nendf)
+        call tpidio(nendf,0,0,tmp,nb,nw)
+        call findf(matb,2,151,nendf)
+        call getaps(nendf,za0,aw,nis,nrr,zai,abni,awi,ehigh,ap,rrf)
+        call repoz(nendf)
+        imf=0
+        apmat=0.0
+        abnsu=0
+        do i=1,nis
+          abnsu=abnsu+abni(i)
+          ner=nrr(i)
+          call ehapi(i,ner,ehigh,ap,rrf,ehi,api,eur)
+          apmat=abni(i)*api+apmat
+        enddo
+        apmat=apmat/abnsu
+        sigpot=4.0*pi*apmat*apmat
+        deallocate(tmp)
+        call repoz(nendf)
+        write(nsyse,*) 'sigpot=',sigpot
+      endif
       write(nsyso,'(/&
         &'' compute flux...fehi, sigpot, nflmax ='',f9.1,f9.2,i8/&
         &4x,''ninwt, jsigz ='',i3,i4)')&
@@ -8131,6 +8163,321 @@ contains
    enddo
    return
    end subroutine getmf6
+
+   subroutine ehapi(i,ner,ehigh,ap,rrf,ehi,api,eur)
+   integer, parameter :: ni=10
+   real(kr), parameter :: elw=4.0,ehw=9118.0
+   integer :: i,ner,ie,imin,imax,lru
+   real(kr) :: ehigh(ni,*),ap(ni,*),rrf(ni,*),ehi,api,eur,el,sum
+   eur=0
+   if (ner.eq.1) then
+     api=ap(i,1)
+   else if (ehigh(i,ner).lt.elw) then
+     api=ap(i,ner)
+   else if (ehigh(i,1).gt.ehw) then
+     api=ap(i,1)
+   else
+     if (ehigh(i,1).gt.elw) then
+       imin=1
+     else
+       imin=1
+       do while(ehigh(i,imin).le.elw)
+         imin=imin+1
+       enddo
+     endif
+     if (ehigh(i,ner).lt.ehw) then
+       imax=ner
+       ehigh(i,ner)=ehw
+     else
+       imax=imin
+       do while(ehigh(i,imax).lt.ehw)
+         imax=imax+1
+       enddo
+       ehigh(i,imax)=ehw
+     endif
+     sum=0.0
+     el=elw
+     do ie=imin,imax
+       sum=ap(i,ie)*log(ehigh(i,ie)/el)+sum
+       el=ehigh(i,ie)
+     enddo
+     api=sum/log(ehw/elw)
+   endif
+   do ie=1,ner
+    lru=int(rrf(i,ie))
+    if (lru.lt.2) then
+      ehi=ehigh(i,ie)
+    else
+      eur=ehigh(i,ie)
+    endif
+   enddo
+   return
+   end subroutine ehapi
+
+   subroutine getaps(lib,za0,aw,nis,nrr,zai,abni,awi,ehigh,ap,rrf)
+   use util   ! provides mess
+   use endf   ! provides endf routines and variables
+   integer, parameter :: ni=10,npp=100000
+   real(kr), parameter :: xmass=1.008665
+   integer :: lib,nis,nrr(ni)
+   real(kr) :: za0,aw,zai(ni),abni(ni),awi(ni),ehigh(ni,*),ap(ni,*),rrf(ni,*)
+   integer :: it(npp),i,ie,ii,jj,k,lfw,lru,lrf
+   integer :: l,ner,n1,n2,mat,mf,mt,ns,naps,njs,nls,nro,nb,nw
+   real(kr) :: x(npp),y(npp),abn,eh,zaii,sen,sum,za,a(6+npp)
+   !
+   call contio(lib,0,0,a,nb,nw)
+   za=a(1)
+   awr=a(2)
+   nis=nint(a(5))
+   n2=nint(a(6))
+   za0=za
+   aw=awr*xmass
+   call contio(lib,0,0,a,nb,nw)
+   zaii=a(1)
+   abn=a(2)
+   lfw=nint(a(4))
+   ner=nint(a(5))
+   n2=nint(a(6))
+   call contio(lib,0,0,a,nb,nw)
+   eh=a(2)
+   lru=nint(a(3))
+   lrf=nint(a(4))
+   nro=nint(a(5))
+   naps=nint(a(6))
+   if (lru.eq.0.and.nis.eq.1.and.ner.eq.1) then
+     !  only scattering radius is given
+     call contio(lib,0,0,a,nb,nw)
+     zai(1)=zaii
+     abni(1)=abn
+     nrr(1)=ner
+     ehigh(1,1)=eh
+     awi(1)=aw
+     ap(1,1)=a(2)
+     rrf(1,1)=float(lru)+0.1*float(lrf)
+   else
+     !  reso data
+     backspace(lib)
+     backspace(lib)
+     do ii=1,nis
+      call contio(lib,0,0,a,nb,nw)
+      zaii=a(1)
+      abn=a(2)
+      lfw=nint(a(4))
+      ner=nint(a(5))
+      n2=nint(a(6))
+      zai(ii)=zaii
+      abni(ii)=abn
+      nrr(ii)=ner
+      do ie=1,ner
+       call contio(lib,0,0,a,nb,nw)
+       eh=a(2)
+       lru=nint(a(3))
+       lrf=nint(a(4))
+       nro=nint(a(5))
+       naps=nint(a(6))
+       ehigh(ii,ie)=eh
+       rrf(ii,ie)=float(lru)+0.1*float(lrf)
+       if (lru.eq.1) then
+       ! resolved resonances
+         if (lrf.lt.4) then
+           if (nro.ne.0) then
+             l=1
+             call tab1io(lib,0,0,a(1),nb,nw)
+             l=l+nw
+             if (l.gt.6*npp) call error('getaps',&
+             'storage for a exceeded(1)',' ')
+             do while (nb.ne.0)
+                call moreio(lib,0,0,a(l),nb,nw)
+                l=l+nw
+                if (l.gt.6*npp) call error('getaps',&
+                'storage for a exceeded(2)',' ')
+             enddo
+             n1=nint(a(5))
+             n2=nint(a(6))
+             if (6+2*n1+2*n2.gt.npp) call error('getaps',&
+             'storage for x and y exceeded(1)',' ')
+             do i=1,n2
+               x(i)=a(6+2*n1+2*i-1)
+               y(i)=a(6+2*n1+2*i)
+             enddo
+             sum=0.0
+             sen=0.0
+             do i=2,n2
+               sum=sum+0.5*(x(i)-x(i-1))*(y(i)+y(i-1))
+               sen=sen+    (x(i)-x(i-1))
+             enddo
+             sum=sum/sen
+             print *,'getaps: a degugggg sum=',sum,' sen=',sen
+             ap(ii,ie)=sum
+             call contio(lib,0,0,a,nb,nw)
+           else
+             call contio(lib,0,0,a,nb,nw)
+             ap(ii,ie)=a(2)
+           endif
+           nls=nint(a(5))
+           do k=1,nls
+            l=1
+            call listio(lib,0,0,a(1),nb,nw)
+            l=l+nw
+            if (l.gt.6*npp) call error('getaps',&
+            'storage for a exceeded(3)',' ')
+            do while (nb.ne.0)
+               call moreio(lib,0,0,a(l),nb,nw)
+               l=l+nw
+               if (l.gt.6*npp) call error('getaps',&
+               'storage for a exceeded(4)',' ')
+            enddo
+            awi(ii)=a(1)*xmass
+           enddo
+         else if(lrf.eq.4) then
+           if (nro.ne.0) then
+             l=1
+             call tab1io(lib,0,0,a(1),nb,nw)
+             l=l+nw
+             if (l.gt.6*npp) call error('getaps',&
+             'storage for a exceeded(5)',' ')
+             do while (nb.ne.0)
+                call moreio(lib,0,0,a(l),nb,nw)
+                l=l+nw
+                if (l.gt.6*npp) call error('getaps',&
+                'storage for a exceeded(6)',' ')
+             enddo
+             n1=nint(a(5))
+             n2=nint(a(6))
+             if (6+2*n1+2*n2.gt.npp) call error('getaps',&
+             'storage for x and y exceeded(2)',' ')
+             do i=1,n2
+               x(i)=a(6+2*n1+2*i-1)
+               y(i)=a(6+2*n1+2*i)
+             enddo
+             sum=0.0
+             do i=2,n2
+               sum=0.5*(x(i)-x(i-1))*(y(i)/x(i)+y(i-1)/x(i-1))+sum
+             enddo
+             ap(ii,ie)=sum/log(x(n2)/x(1))
+             call contio(lib,0,0,a,nb,nw)
+           else
+             call contio(lib,0,0,a,nb,nw)
+             ap(ii,ie)=a(2)
+           endif
+           nls=nint(a(5))
+           l=1
+           call listio(lib,0,0,a(1),nb,nw)
+           l=l+nw
+           if (l.gt.6*npp) call error('getaps',&
+           'storage for a exceeded(7)',' ')
+           do while (nb.ne.0)
+              call moreio(lib,0,0,a(l),nb,nw)
+              l=l+nw
+              if (l.gt.6*npp) call error('getaps',&
+              'storage for a exceeded(8)',' ')
+           enddo
+           awi(ii)=a(1)*xmass
+           do jj=1,nls
+            call contio(lib,0,0,a,nb,nw)
+            njs=nint(a(5))
+            do k=1,njs
+             l=1
+             call listio(lib,0,0,a(1),nb,nw)
+             l=l+nw
+             if (l.gt.6*npp) call error('getaps',&
+             'storage for a exceeded(9)',' ')
+             do while (nb.ne.0)
+                call moreio(lib,0,0,a(l),nb,nw)
+                l=l+nw
+                if (l.gt.6*npp) call error('getaps',&
+                'storage for a exceeded(10)',' ')
+             enddo
+            enddo
+           enddo
+         else
+           call error('getaps',&
+           'this program can not work with grm(irf=5) or hrf(irf=6)',' ')
+         endif
+       else if (lru.eq.2) then
+         ! unresolved resonances
+         if(lrf.eq.1) then
+           if(lfw.eq.0) then
+             call contio(lib,0,0,a,nb,nw)
+             nls=nint(a(5))
+             ap(ii,ie)=a(2)
+             do k=1,nls
+               l=1
+               call listio(lib,0,0,a(1),nb,nw)
+               l=l+nw
+               if (l.gt.6*npp) call error('getaps',&
+               'storage for a exceeded(11)',' ')
+               do while (nb.ne.0)
+                  call moreio(lib,0,0,a(l),nb,nw)
+                  l=l+nw
+                  if (l.gt.6*npp) call error('getaps',&
+                  'storage for a exceeded(12)',' ')
+               enddo
+               awi(ii)=a(1)*xmass
+             enddo
+           else
+             l=1
+             call listio(lib,0,0,a(1),nb,nw)
+             l=l+nw
+             if (l.gt.6*npp) call error('getaps',&
+             'storage for a exceeded(13)',' ')
+             do while (nb.ne.0)
+                call moreio(lib,0,0,a(l),nb,nw)
+                l=l+nw
+                if (l.gt.6*npp) call error('getaps',&
+                'storage for a exceeded(14)',' ')
+             enddo
+             ap(ii,ie)=a(2)
+             do k=1,nls
+               call contio(lib,0,0,a,nb,nw)
+               njs=nint(a(5))
+               awi(ii)=a(1)*xmass
+               do jj=1,njs
+                 l=1
+                 call listio(lib,0,0,a(1),nb,nw)
+                 l=l+nw
+                 if (l.gt.6*npp) call error('getaps',&
+                 'storage for a exceeded(15)',' ')
+                 do while (nb.ne.0)
+                    call moreio(lib,0,0,a(l),nb,nw)
+                    l=l+nw
+                    if (l.gt.6*npp) call error('getaps',&
+                    'storage for a exceeded(16)',' ')
+                 enddo
+               enddo
+             enddo
+           endif
+         else
+           call contio(lib,0,0,a,nb,nw)
+           nls=nint(a(4))
+           ap(ii,ie)=a(2)
+           do k=1,nls
+             call contio(lib,0,0,a,nb,nw)
+             awi(ii)=a(1)*xmass
+             do jj=1,njs
+               l=1
+               call listio(lib,0,0,a(1),nb,nw)
+               l=l+nw
+               if (l.gt.6*npp) call error('getaps',&
+               'storage for a exceeded(17)',' ')
+               do while (nb.ne.0)
+                  call moreio(lib,0,0,a(l),nb,nw)
+                  l=l+nw
+                  if (l.gt.6*npp) call error('getaps',&
+                  'storage for a exceeded(18)',' ')
+               enddo
+             enddo
+           enddo
+         endif
+       else if (lru.eq.0.and.nis.gt.1)then
+         call contio(lib,0,0,a,nb,nw)
+         ap(ii,ie)=a(2)
+       endif
+     enddo
+    enddo
+   endif
+   return
+   end subroutine getaps
 
    subroutine cm2lab(inow,jnow,lnow,c,nl,lang,lep,max)
    !-------------------------------------------------------------------
