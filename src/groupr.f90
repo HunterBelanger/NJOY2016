@@ -8256,8 +8256,7 @@ contains
      rrf(1,1)=float(lru)+0.1*float(lrf)
    else
      !  reso data
-     backspace(lib)
-     backspace(lib)
+     call skiprz(lib,-2)
      do ii=1,nis
       call contio(lib,0,0,a,nb,nw)
       zaii=a(1)
