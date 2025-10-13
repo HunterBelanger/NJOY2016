@@ -2952,7 +2952,7 @@ contains
    enddo
    !
    ! *lump idreac, dener, ipreac and prate.
-   treshold=1.0e8*log(2.0)/60.0
+   treshold=1.0e8*log(2.0)/1000.0
    iter=0
    40 iter=iter+1
    if(iter.gt.maxit) call error('dralum','too many iterations',' ')
@@ -3036,7 +3036,7 @@ contains
        enddo
        ymax=0.0
        if((mod(idreac(2,jnd),100).eq.5).and.(ddeca(jnd).lt.treshold)) then
-         ! jnd is a lumped fission product with a half-life > 1 min
+         ! jnd is a lumped fission product with a half-life > 1000 sec
          jfp=idreac(2,jnd)/100
          do kso=1,nbiso ! fissile isotope
            if(mod(idreac(2,kso),100).ne.4) cycle
