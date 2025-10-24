@@ -1407,31 +1407,9 @@ contains
      enddo
      if(.not.lfind) cycle
      kap=0.0
-     if(mth.eq.18) then
-       ! ***fission -- recover pseudo-Q kappa info in mf=1, mt=458
-       call repoz(nendf)
-       lfind=.false.
-       do while (.not.lfind)
-         if(nendf.lt.0) then
-           read(-nendf,end=10) math,mfh,mth,nb,nw
-         else if(nendf.gt.0) then
-           read(nendf,'(66x,i4,i2,i3,i5)',end=10) math,mfh,mth,nsp
-         endif
-         if(math.eq.-1) then
-           call repoz(nendf)
-           go to 10
-         endif
-         lfind=(math.eq.matno).and.(mfh.eq.1).and.(mth.eq.458)
-       enddo
-       if(lfind) then
-         call listio(nendf,0,0,scr,nb,nw)
-         kap=scr(lz+15)
-       endif
-     else
-       ! ***else -- recover the Q of the reaction (may be negative)
-       call contio(nendf,0,0,scr,nb,nw)
-       kap=c1h
-     endif
+     ! recover the Q or pseudo-Q of the reaction (may be negative)
+     call contio(nendf,0,0,scr,nb,nw)
+     kap=c1h
      if(kap.eq.0.0) cycle
      do ig=1,ng
        sigq(ig,1)=sigq(ig,1)+kap*rv(ig,1,1)
