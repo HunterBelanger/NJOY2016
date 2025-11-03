@@ -57,6 +57,7 @@ contains
    !             (default=0).
    !   prflag    probability table flag: off/on = 0/1. prflag=1 if
    !             purr information is available. (default=0)
+   !   idecay    fission product decay heat option (0 include, 1 don't)
    !   iprint    long print option (0/1=minimum/maximum) (default=0)
    ! card 2 hollerith identification for the library
    ! (nimpo=0 only)
@@ -135,7 +136,7 @@ contains
    character(len=150) hsmg
    integer i,ig,igaut0,igaut1,igrest,igres0,igres1,igecco,iig,ipflag,iza, &
    & nb,nbesp,ndcy,nendf,nexpo,nfp,nimpo,npen,nw,ilong,ilong1,ityxsm,inew, &
-   & irflag,iprint,ner,igar(1)
+   & irflag,idecay,iprint,ner,igar(1)
    logical lsame,lurr,lkerma
    real(kr) ener(maxgr+1),eesp(maxesp+1),delecco,delig
    real eespi(maxesp+1),gar(1)
@@ -160,8 +161,10 @@ contains
    nexpo=0
    ipflag=0
    irflag=0
+   idecay=0
    iprint=0
-   read(nsysi,*) nendf,npen,ngen,nfp,ndcy,nimpo,nexpo,ipflag,irflag,iprint
+   read(nsysi,*) nendf,npen,ngen,nfp,ndcy,nimpo,nexpo,ipflag,irflag,idecay, &
+   & iprint
    allocate(scr(maxa))
    !
    !**open the input/output files
@@ -175,8 +178,9 @@ contains
    &  '' output draglib unit ......................... '',i10/ &
    &  '' scattering storage flag ..................... '',i10/ &
    &  '' purr information flag ....................... '',i10/ &
+   &  '' FP decay heat option (0 include, 1 don t) ... '',i10/ &
    &  '' print option (0 min, 1 max) ................. '',i10)') &
-   &  nendf,npen,ngen,nfp,ndcy,nimpo,nexpo,ipflag,irflag,iprint
+   &  nendf,npen,ngen,nfp,ndcy,nimpo,nexpo,ipflag,irflag,idecay,iprint
    if(nendf.ne.0) call openz(nendf,0)
    if(npen.ne.0) call openz(npen,0)
    if(ngen.ne.0) call openz(ngen,0)
@@ -385,7 +389,7 @@ contains
      &    '' kerma factor availability ................... '',l10)') lkerma
      if(nendf.ne.0) then
        ! ***construct the "isotopic specification line" for the burnup data.
-       call dradat(nendf,matno,text8,lkerma)
+       call dradat(nendf,matno,text8)
      endif
      !
      ! ***put autolib data in draglib file for this material
@@ -424,7 +428,7 @@ contains
    ! **compute depletion-related data
    20 if((nfp.ne.0).and.(ndcy.ne.0)) then
    call xsmsix(draglib,'DEPL-CHAIN',1)
-   call dradep(nfp,ndcy)
+   call dradep(nfp,ndcy,idecay,iprint)
    call xsmsix(draglib,' ',2)
    call closz(ndcy)
    call closz(nfp)
@@ -509,7 +513,7 @@ contains
    return
    end subroutine dragr
    !
-   subroutine dradat(nendf,matno,text8,lkerma)
+   subroutine dradat(nendf,matno,text8)
    !-----------------------------------------------------------------
    ! Construct the "isotopic specification line" for the burnup data.
    !-----------------------------------------------------------------
@@ -521,7 +525,7 @@ contains
    integer nendf,matno
    character hline*80,text8*8
    integer ied,iof,iof2,iza,nb,nw
-   logical lkerma,lfind
+   logical lfind
    integer,save,dimension(maxedi) :: malist1= &
    & (/ 16, 17, 18, 28, 37,102,103,104,105,106,107,108 /)
    integer,save,dimension(maxedi) :: malist2= &
@@ -937,7 +941,7 @@ contains
        enddo
      enddo
      !
-     ! ***process H-FACTOR if lkerma=.false.
+     ! ***create H-FACTOR if lkerma=.false.
      if(.not.lkerma) then
        ! use the legacy Dragon formula based on Q and pseudo-Q values
        call draq(nendf,ngen,matno,ytemp,nz0,ng,igfirs(1),iglast(1))
@@ -2228,7 +2232,7 @@ contains
    return
    end subroutine fvect
    !
-   subroutine dradep(nfp,ndcy)
+   subroutine dradep(nfp,ndcy,idecay,iprint)
    !-----------------------------------------------------------------
    !   compute depletion-related information.
    !-----------------------------------------------------------------
@@ -2236,8 +2240,8 @@ contains
    use endf   ! provides endf routines and variables
    use util   ! provides timer,openz,repoz,error
    integer :: maxa,maxiso,nreac,nfath,maxch
-   parameter(maxa=10000,maxiso=4000,nreac=14,nfath=40,maxch=800)
-   integer nfp,ndcy,izae,nbch,nbfiss,nbfp,nbfpch,nbiso,nw
+   parameter(maxa=10000,maxiso=4000,nreac=14,nfath=50,maxch=800)
+   integer nfp,ndcy,idecay,iprint,izae,nbch,nbfiss,nbfp,nbfpch,nbiso,nw
    real(kr) en(nfath,maxch),br(nfath,maxch)
    integer mylist(maxiso,3)
    character(len=4) hiso(3,maxiso)
@@ -2255,7 +2259,7 @@ contains
    !   hich [[ hrch en br ]] /
    !   ]]
    !   end /
-   !   where hich : character*8 name of the isotope
+   !   where hich : character*8 name of the Draglib isotope
    !         hrch : character*8 name of a neutron induced reaction (not
    !                a scattering type reaction)
    !         en   : energy released by the neutron induced reaction
@@ -2267,7 +2271,7 @@ contains
      mylist(iso,2)=0
      mylist(iso,3)=0
    enddo
-  nbch=0
+   nbch=0
    nbiso=0
    do
      nbch=nbch+1
@@ -2464,7 +2468,8 @@ contains
    !
    !**lump the burnup chain from nbiso to nbch isotopes
    call dralum(maxfp,nbiso,nbfiss,nbdpf,nreac,nfath,mylist(1,1),hiso, &
-   & nbch,nbfpch,hich,hrch,en,br,idreac,dener,ddeca,ipreac,prate,yield)
+   & nbch,nbfpch,hich,hrch,en,br,idreac,dener,ddeca,ipreac,prate,yield, &
+   & idecay,iprint)
    deallocate(yield,prate,ddeca,dener)
    deallocate(ipreac,idreac)
    deallocate(scr)
@@ -2495,25 +2500,13 @@ contains
    real(kr), save, dimension(maxen) :: terp=(/ 1.0, 0.0, 0.0, 0.0 /)
    !
    allocate(indpf(nbdpf),scr(maxa))
-   do iso=1,nbiso
-     ddeca(iso)=0.0
-     do ireac=1,nreac
-       idreac(ireac,iso)=0
-       dener(ireac,iso)=0.0
-     enddo
-   enddo
-   do iso=1,nbiso
-     do ifath=1,nfath
-       ipreac(ifath,iso)=0
-       prate(ifath,iso)=0.0
-     enddo
-   enddo
-   do ipf=1,nbdpf
-     indpf(ipf)=0
-     do ifiss=1,nbfiss
-       yield(ifiss,ipf)=0.0
-     enddo
-   enddo
+   ddeca(:nbiso)=0.0
+   idreac(:nreac,:nbiso)=0
+   dener(:nreac,:nbiso)=0.0
+   ipreac(:nfath,:nbiso)=0
+   prate(:nfath,:nbiso)=0.0
+   indpf(:nbdpf)=0
+   yield(:nbfiss,:nbdpf)=0.0
    !
    call repoz(nfp)
    ifpss=0
@@ -2537,7 +2530,7 @@ contains
        go to 150
      endif
      ifiss=ifiss+1
-      if(ifiss.gt.nbfiss) call error('draevo','nbfiss overflow',' ')
+     if(ifiss.gt.nbfiss) call error('draevo','nbfiss overflow',' ')
      za=c1h
      awr=c2h
      call contio(nfp,0,0,scr,nb,nw)
@@ -2776,21 +2769,23 @@ contains
    end subroutine draind
    !
    subroutine dralum(maxfp,nbiso,nbfiss,nbdpf,nreac,nfath,mylist,hiso, &
-   & nbch,nbfpch,hich,hrch,en,br,idreac,dener,ddeca,ipreac,prate,yield)
+   & nbch,nbfpch,hich,hrch,en,br,idreac,dener,ddeca,ipreac,prate,yield, &
+   & idecay,iprint)
    !-----------------------------------------------------------------
    !   complete and lump the burnup chain from nbiso to nbch isotopes.
    !   write the lumped chain on the xsm file.
    !-----------------------------------------------------------------
    use mainio ! provides nsysi,contio,nsyso,nsyse
    use util   ! provides error
-   integer :: maxrea,nstate,maxit,maxfat
-   parameter (maxrea=14,nstate=40,maxit=20,maxfat=50)
-   integer maxfp,nbiso,nbfiss,nbdpf,nreac,nfath,nbch,nbfpch,ireac,iter, &
-   & iso,isoo,i,j,ia,ja,ibfp,ida,ifa,ifath,ifi,ifp,ifps,iii,im,ind,ipgar, &
-   & iz,j0,jfath,jfp,jnd,jnd1,jnd2,jso,jz,k,knd,kreac,kso,kt,nbheav,nn,nlump
-   real(kr) prgar,ymax,treshold
+   integer :: maxrea,nstate,maxit,nfath
+   parameter (maxrea=14,nstate=40,maxit=20)
+   integer maxfp,nbiso,nbfiss,nbdpf,nreac,nbch,nbfpch,idecay,iprint,ireac, &
+   & iter,iso,isoo,i,j,ia,ja,ibfp,ida,ifa,ifath,ifi,ifp,ifps,iii,im,ind, &
+   & ipgar,iz,j0,jfath,jfp,jnd,jnd1,jnd2,jso,jz,k,knd,kreac,kso,kt,nbheav,nn, &
+   & nlump,ja2,jz2,indifi
+   real(kr) prgar,ymax
    real(kr) en(nfath,nbch),br(nfath,nbch)
-   character hrch(nfath,nbch)*8,hich(nbch)*8,hname*8,text4*4
+   character hrch(nfath,nbch)*8,hich(nbch)*8,hname*8,text4*4,hsmg*131
    integer mylist(nbiso),idreac(nreac,nbiso),ipreac(nfath,nbiso),istate(nstate)
    character(len=4) hiso(3,nbiso),hreac(2,maxrea),in(2)
    real(kr) over_half,dener(nreac,nbiso),ddeca(nbiso),prate(nfath,nbiso), &
@@ -2799,14 +2794,15 @@ contains
    character(len=4), allocatable, dimension(:,:) :: hhhh
    real, allocatable, dimension(:) :: dddd
    real, allocatable, dimension(:,:) :: rrate,eener,eyiel
+   real(kr), allocatable, dimension(:) :: delayed,cyield
    character(len=8), save, dimension(maxrea) :: reac= &
    & (/ 'DECAY   ','NFTOT   ','NG      ','N2N     ','N3N     ','N4N     ', &
    &    'NA      ','NP      ','N2A     ','NNP     ','ND      ','NT      ', &
    &    'NHE3    ','NODECAY ' /)
    !
    if(nreac.ne.maxrea) call error('dralum','maxrea overflow',' ')
-   allocate(jpreac(maxfat,nbch),jdreac(nreac-1,nbch),ipos(nbch,2),hhhh(3,nbch))
-   allocate(rrate(maxfat,nbch),eener(nreac-1,nbch),eyiel(nbfiss,nbfpch), &
+   allocate(jpreac(nfath,nbch),jdreac(nreac-1,nbch),ipos(nbch,2),hhhh(3,nbch))
+   allocate(rrate(nfath,nbch),eener(nreac-1,nbch),eyiel(nbfiss,nbfpch), &
    & dddd(nbch))
    !
    ! **find the position of the lumped isotopes in the complete chain
@@ -2833,16 +2829,16 @@ contains
        ireac=0
        jz=iz
        ja=0
+       jz2=0
+       ja2=0
        if(hrch(i,iso).eq.'nftot') then
          jz=0
          if(idreac(2,ind).eq.0) idreac(2,ind)=3
          ireac=2
-         !
        else if(hrch(i,iso).eq.'NODECAY') then
          jz=0
          if(idreac(2,ind).eq.0) idreac(2,ind)=3
          ireac=14
-         !
        else if(hrch(i,iso).eq.'ng') then
          ja=ia+1
          idreac(3,ind)=1
@@ -2864,39 +2860,79 @@ contains
          ja=ia-3
          idreac(7,ind)=1
          ireac=7
+         jz2=2 ; ja2=4 ! tertiary particle=He4
        else if(hrch(i,iso).eq.'np') then
          jz=iz-1
          ja=ia
          idreac(8,ind)=1
          ireac=8
+         jz2=1 ; ja2=1 ! tertiary particle=H1
        else if(hrch(i,iso).eq.'n2a') then
          jz=iz-4
          ja=ia-7
          idreac(9,ind)=1
          ireac=9
+         jz2=2 ; ja2=4 ! tertiary particle=He4
        else if(hrch(i,iso).eq.'nnp') then
          jz=iz-1
          ja=ia-1
          idreac(10,ind)=1
          ireac=10
+         jz2=1 ; ja2=1 ! tertiary particle=H1
        else if(hrch(i,iso).eq.'nd') then
          jz=iz-1
          ja=ia-1
          idreac(11,ind)=1
          ireac=11
+         jz2=1 ; ja2=2 ! tertiary particle=H2
        else if(hrch(i,iso).eq.'nt') then
          jz=iz-1
          ja=ia-2
          idreac(12,ind)=1
          ireac=12
+         jz2=1 ; ja2=3 ! tertiary particle=H3
        else if(hrch(i,iso).eq.'nhe3') then
          jz=iz-2
          ja=ia-2
          idreac(13,ind)=1
          ireac=13
+         jz2=2 ; ja2=3 ! tertiary particle=He3
        endif
-       if(ireac.eq.0) call error('dralum','ireac=0',' ')
-       dener(ireac,ind)=en(i,iso)
+       if(ireac.eq.0) then
+         write(hsmg,'(8hisotope ,2A4,16h has no reaction)') hiso(:2,ind)
+         call error('dralum',hsmg,' ')
+       else if(en(i,iso).ne.0.0) then
+         write(hsmg,'(8hisotope ,2A4,16h has no H-FACTOR)') hiso(:2,ind)
+         call error('dralum',hsmg,' ')
+       endif
+       !
+       ! tertiary production of a light nucleus
+       if((jz2.ne.0).and.(ja2.ne.0).and.(iz.le.10)) then
+         ! only consider tertiary production for lighter father isotopes
+         call draind(nbiso,10000*jz2+10*ja2,mylist,jnd)
+         if(jnd.eq.-1) then
+           write(hsmg,'(21hno isotope with izae=,i10)') 10000*jz2+10*ja2
+           call error('dralum',hsmg,' ')
+         else if((ja.eq.ja2).and.(jz.eq.jz2)) then
+           ! two identical secondary nuclei
+           do ifath=1,nfath
+             if(ipreac(ifath,jnd).eq.ind*100+ireac) then
+               prate(ifath,jnd)=2.0*(1.0-br(i,iso))
+               exit
+             endif
+           enddo
+         else
+           do ifath=1,nfath
+             if(ipreac(ifath,jnd).eq.0) then
+               ipreac(ifath,jnd)=ind*100+ireac
+               prate(ifath,jnd)=1.0-br(i,iso)
+               exit
+             endif
+           enddo
+         endif
+       endif
+       !
+       ! secondary nucleus
        if(jz.ne.0) then
          call draind(nbiso,10000*jz+10*ja,mylist,jnd)
          if(jnd.gt.0) then
@@ -2929,8 +2965,58 @@ contains
      30 continue
    enddo
    !
-   ! *lump idreac, dener, ipreac and prate.
-   treshold=1.0e8*log(2.0)/1000.0
+   ! compute cumulative decay heat from lumped isotopes
+   allocate(cyield(nbiso),delayed(nbfiss))
+   delayed(:nbfiss)=0.0d0
+   do ifi=1,nbfiss
+     cyield(:nbiso)=0.0d0 ! cumulative yields
+     indifi=0
+     do ida=1,nbiso
+       if(mod(idreac(2,ida),100).eq.4) then
+         if(idreac(2,ida)/100.eq.ifi) indifi=ida
+       else if(mod(idreac(2,ida),100).eq.5) then
+         jfp=idreac(2,ida)/100
+         cyield(ida)=yield(ifi,jfp)
+       endif
+     enddo ! ida
+     if(indifi.eq.0) call error('dralum','no fissile index',' ')
+     loop1: do ida=1,nbiso
+       do ifath=1,nfath
+         if(ipreac(ifath,ida).eq.0) exit
+         if(mod(ipreac(ifath,ida),100).ne.1) cycle
+         ind=ipreac(ifath,ida)/100
+         cyield(ida)=cyield(ida)+prate(ifath,ida)*cyield(ind)
+       enddo
+       if(cyield(ida)*dener(1,ida).eq.0.0) cycle
+       delayed(ifi)=delayed(ifi)+cyield(ida)*dener(1,ida)
+       if(idecay.eq.0) then
+         ! decay heat correction to EGD+EB+END for Draglib fission products
+         do iso=1,nbch
+           ind=ipos(iso,1)
+           if(ind.eq.ida) then
+             ! ida is a delayed energy precursor which is not lumped. Remove
+             ! this energy deposition from DEPLETE-ENER
+             dener(2,indifi)=dener(2,indifi)-cyield(ida)*dener(1,ida)
+             cycle loop1
+           endif
+         enddo
+       endif
+     enddo loop1
+   enddo ! ifi
+   if(iprint.gt.0) then
+     write(nsyso,'(/52h dralum: delayed fission energy from cumulative yiel, &
+     & 2hds/12x,10hEND+EGD+EB,5x,26hcorrection in DEPLETE-ENER)')
+     do ida=1,nbiso
+       if(mod(idreac(2,ida),100).ne.4) cycle
+       ifi=idreac(2,ida)/100
+       if(ifi.eq.0) cycle
+       write(nsyso,'(1x,2a4,f9.4,4h MeV,3x,f9.4,4h MeV)') hiso(:2,ida), &
+       & delayed(ifi),dener(2,ida)
+     enddo
+   endif
+   deallocate(delayed,cyield)
+   !
+   ! lump the decay chains, including independent yields
    iter=0
    40 iter=iter+1
    if(iter.gt.maxit) call error('dralum','too many iterations',' ')
@@ -2976,7 +3062,10 @@ contains
                  endif
                  if(ipreac(k,ida).eq.0) im=k
                enddo
-               if(im.gt.nfath) call error('dralum','nfath overflow',' ')
+               if(im.gt.nfath) then
+                 write(hsmg,'(25hnfath overflow-3 isotope=,2a4)') hiso(:2,ida)
+                 call error('dralum',hsmg,' ')
+               endif
                ipreac(im,ida)=ipreac(jfath,jnd)
                prate(im,ida)=prgar*prate(jfath,jnd)
                45 continue
@@ -3003,54 +3092,48 @@ contains
            endif
          enddo
        enddo
+       ! add decay heat to Draglib isotopes
        do jfath=1,nfath
-         if(ipreac(jfath,jnd).gt.0) then
-           kt=mod(ipreac(jfath,jnd),100) ! reaction
-           knd=ipreac(jfath,jnd)/100 ! new father
-           dener(kt,knd)=dener(kt,knd)+prate(jfath,jnd)*dener(1,jnd)
-         endif
+         if(ipreac(jfath,jnd).eq.0) exit
+         kt=mod(ipreac(jfath,jnd),100) ! reaction
+         if(kt.eq.2) call error('dralum','fission forbidden',' ')
+         knd=ipreac(jfath,jnd)/100 ! new father
+         dener(kt,knd)=dener(kt,knd)+prate(jfath,jnd)*dener(1,jnd)
          ipreac(jfath,jnd)=0
          prate(jfath,jnd)=0.0
        enddo
        ymax=0.0
-       if((mod(idreac(2,jnd),100).eq.5).and.(ddeca(jnd).lt.treshold)) then
-         ! jnd is a lumped fission product with a half-life > 1000 sec
+       if(mod(idreac(2,jnd),100).eq.5) then
          jfp=idreac(2,jnd)/100
-         do kso=1,nbiso ! fissile isotope
-           if(mod(idreac(2,kso),100).ne.4) cycle
-           ifi=idreac(2,kso)/100
-           dener(2,kso)=dener(2,kso)+yield(ifi,jfp)*dener(1,jnd)
-         enddo
          do ifi=1,nbfiss
            ymax=max(ymax,abs(yield(ifi,jfp)))
-           yield(ifi,jfp)=0.0
          enddo
-         dener(2,jnd)=0.0
-         idreac(2,jnd)=0
        endif
        dener(1,jnd)=0.0
        idreac(1,jnd)=0
-       over_half=86400.0*ddeca(jnd)/(1.0e8*log(2.0))
-       if(over_half.eq.0.0) then
-         call dranam(mylist(jnd),hname)
-         write(nsyso,'('' warning: isotope '',a8,'' is lumped and'', &
-         & '' is stable. Max fission yield='',1p,e8.1,''%'')') hname,ymax*100.0
-         if(ymax.gt.1.0E-2) call error('dralum','isotope '//hname// &
-         & ' should not be lumped(1)',' ')
-       else if((1.0/over_half.gt.40.0).and.(1.0/over_half.lt.999999.99)) then
-         call dranam(mylist(jnd),hname)
-         write(nsyso,'('' warning: isotope '',a8,'' is lumped and'', &
-         & '' has a half-life of'',f10.2,'' days. Max fission yield='', &
-         & 1p,e8.1,''%'')') hname,1.0/over_half,ymax*100.0
-         if(ymax.gt.1.0E-2) call error('dralum','isotope '//hname// &
-         & ' should not be lumped(2)',' ')
-       else if(1.0/over_half.gt.40.0) then
-         call dranam(mylist(jnd),hname)
-         write(nsyso,'('' warning: isotope '',a8,'' is lumped and'', &
-         & '' has a half-life of'',1p,e10.3,'' days. Max fission yi'', &
-         & ''eld='',e8.1,''%'')') hname,1.0/over_half,ymax*100.0
-         if(ymax.gt.1.0E-2) call error('dralum','isotope '//hname// &
-         & ' should not be lumped(3)',' ')
+       if(ymax.gt.0.0) then
+         over_half=86400.0*ddeca(jnd)/(1.0e8*log(2.0))
+         if(over_half.eq.0.0) then
+           call dranam(mylist(jnd),hname)
+           write(nsyso,'('' warning: isotope '',a8,'' is lumped and is'', &
+           & '' stable. Max fission yield='',1p,e8.1,''%'')') hname,ymax*100.0
+           if(ymax.gt.1.0E-2) call error('dralum','isotope '//hname// &
+           & ' should not be lumped(1)',' ')
+         else if((1.0/over_half.gt.40.0).and.(1.0/over_half.lt.999999.99)) then
+           call dranam(mylist(jnd),hname)
+           write(nsyso,'('' warning: isotope '',a8,'' is lumped and'', &
+           & '' has a half-life of'',f10.2,'' days. Max fission yield='', &
+           & 1p,e8.1,''%'')') hname,1.0/over_half,ymax*100.0
+           if(ymax.gt.1.0E-2) call error('dralum','isotope '//hname// &
+           & ' should not be lumped(2)',' ')
+         else if(1.0/over_half.gt.40.0) then
+           call dranam(mylist(jnd),hname)
+           write(nsyso,'('' warning: isotope '',a8,'' is lumped and'', &
+           & '' has a half-life of'',1p,e10.3,'' days. Max fission yi'', &
+           & ''eld='',e8.1,''%'')') hname,1.0/over_half,ymax*100.0
+           if(ymax.gt.1.0E-2) call error('dralum','isotope '//hname// &
+           & ' should not be lumped(3)',' ')
+         endif
        endif
        ddeca(jnd)=0.0
        mylist(jnd)=0
@@ -3061,9 +3144,18 @@ contains
    write(nsyso,'('' ......... nlump='',i5)') nlump
    if(nlump.gt.0) go to 40
    !
+   ! if idecay=1, set decay heat of fission products to zero
+   if(idecay.eq.1) then
+     do iso=1,nbch
+       ind=ipos(iso,1)
+       ia=mod(mylist(ind),10000)/10
+       if(ia.le.210) dener(1,ind)=0.0
+     enddo
+   endif
+   !
    ! *write vectors 'PRODUCE-REAC' and 'PRODUCE-RATE' to the xsm file
    do iso=1,nbch
-     do ifath=1,maxfat
+     do ifath=1,nfath
        jpreac(ifath,iso)=0
        rrate(ifath,iso)=0.0
      enddo
@@ -3088,9 +3180,9 @@ contains
            & 2a4)') hiso(1,jnd),hiso(2,jnd),hiso(1,ind),hiso(2,ind)
          else
            nn=nn+1
-           if(nn.gt.maxfat) then
+           if(nn.gt.nfath) then
              write(text4,'(i4)') nn
-             call error('dralum','maxfat overflow nn='//text4,' ')
+             call error('dralum','nfath overflow nn='//text4,' ')
            endif
            jpreac(nn,iso)=100*jso+mod(ipreac(ifath,ind),100)
            rrate(nn,iso)=real(prate(ifath,ind))
@@ -3098,8 +3190,8 @@ contains
        endif
      enddo
    enddo
-   call xsmput(draglib,'PRODUCE-REAC',reshape(jpreac,(/ maxfat*nbch /)))
-   call xsmput(draglib,'PRODUCE-RATE',reshape(rrate,(/ maxfat*nbch /)))
+   call xsmput(draglib,'PRODUCE-REAC',reshape(jpreac,(/ nfath*nbch /)))
+   call xsmput(draglib,'PRODUCE-RATE',reshape(rrate,(/ nfath*nbch /)))
    !
    ! *write the isotope ascii names and header information on xsm file
    do i=1,nreac-1
@@ -3179,7 +3271,7 @@ contains
    istate(4)=nbheav
    istate(5)=nbch-nbheav
    istate(8)=nreac-1
-   istate(9)=maxfat
+   istate(9)=nfath
    call xsmput(draglib,'STATE-VECTOR',istate)
    deallocate(dddd,eyiel,eener,rrate)
    deallocate(hhhh,ipos,jdreac,jpreac)

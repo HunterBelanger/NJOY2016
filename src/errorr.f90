@@ -9756,6 +9756,8 @@ contains
    !    32      UKAEA 1102-group structure
    !    33      UKAEA  142-group structure
    !    34      LANL 618-group structure
+   !    35      APOLLO 99-group structure
+   !    36      ECCO 1962-group structure
    !
    !-------------------------------------------------------------------
    use mainio ! provides nsyso
