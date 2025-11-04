@@ -208,20 +208,17 @@ dragr
  4.000000 /
  0/
 --
--- Adding decay chains and fission yields. Also, Q values are given directly below.
--- In routine calculations, Q values are extracted from above dragr call outputs
--- (grepped from NJOY output file and inserted in another dragr call).
+-- Adding lumped decay chains and fission yields. Also, user-defined branching
+-- ratios are set for the Draglib isotopes. These values are grepped from NJOY
+-- output file and inserted in another dragr call.
 --
 dragr
  0 0 0 50 51 30 29/
- H1_H2O   ng  0.0000E+00 0.000 /                                                 
- Kr83     n2n  0.0000E+00 0.000 n3n  0.0000E+00 0.000 nnp  0.0000E+00 0.000      
-          ng  0.0000E+00 0.000 np  0.0000E+00 0.000 nd  0.0000E+00 0.000         
-          nt  0.0000E+00 0.000 nhe3  0.0000E+00 0.000 na  0.0000E+00 0.000 /     
- Sn119    n2n  0.0000E+00 0.000 n3n  0.0000E+00 0.000 nnp  0.0000E+00 0.000      
-          ng  0.0000E+00 0.000 np  0.0000E+00 0.000 nd  0.0000E+00 0.000         
-          nt  0.0000E+00 0.000 na  0.0000E+00 0.000 /                            
- Pu239    n2n  0.0000E+00 0.000 n3n  0.0000E+00 0.000 nftot  0.0000E+00 0.000    
-          n4n  0.0000E+00 0.000 ng  0.0000E+00 0.000 /                           
+ H1_H2O   ng  0.000 /                                                 
+ Kr83     n2n  0.000 n3n  0.000 nnp  0.000 ng  0.000 np  0.000 nd  0.000         
+          nt  0.000 nhe3  0.000 na  0.000 /     
+ Sn119    n2n  0.000 n3n  0.000 nnp  0.000 ng  0.000 np  0.000 nd  0.000         
+          nt  0.000 na  0.000 /                            
+ Pu239    n2n  0.000 n3n  0.000 nftot  0.000 n4n  0.000 ng  0.000 /                           
 end /
 stop

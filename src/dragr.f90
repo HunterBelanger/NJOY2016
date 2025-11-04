@@ -104,12 +104,12 @@ contains
    !             issued by subroutine dralum.
    !   hrch(1)   hollerith neutron-induced reaction identifier for
    !             first daughter
-   !   en(1)     Q value in MeV for first daughter
-   !   br(1)     branching ratio for an isomeric daughter (=0.0 if
+   !   br(1)     branching ratio for an isomeric daughter (=0.000 if
    !             there is no isomeric daughter)
    !   hrch(2)   hollerith neutron-induced reaction identifier for
    !             second daughter
-   !   en(2)     Q value in MeV for second daughter
+   !   br(2)     branching ratio for an isomeric daughter (=0.000 if
+   !             there is no isomeric daughter)
    !  ...
    !
    !            repeat card 9 for all isotopes present in the
@@ -136,7 +136,7 @@ contains
    character(len=150) hsmg
    integer i,ig,igaut0,igaut1,igrest,igres0,igres1,igecco,iig,ipflag,iza, &
    & nb,nbesp,ndcy,nendf,nexpo,nfp,nimpo,npen,nw,ilong,ilong1,ityxsm,inew, &
-   & irflag,idecay,iprint,ner,igar(1)
+   & irflag,idecay,iprint,ner,igar(1),impy
    logical lsame,lurr,lkerma
    real(kr) ener(maxgr+1),eesp(maxesp+1),delecco,delig
    real eespi(maxesp+1),gar(1)
@@ -165,6 +165,7 @@ contains
    iprint=0
    read(nsysi,*) nendf,npen,ngen,nfp,ndcy,nimpo,nexpo,ipflag,irflag,idecay, &
    & iprint
+   impy=max(0,iprint-1)
    allocate(scr(maxa))
    !
    !**open the input/output files
@@ -207,9 +208,9 @@ contains
      call openz(nimpo,0)
      call xsmop(draglib,'drag',0,1)
      if(nimpo.gt.0) then
-       call xsmexp(draglib,nimpo,2,2,iprint)
+       call xsmexp(draglib,nimpo,2,2,impy)
      else
-       call xsmexp(draglib,-nimpo,1,2,iprint)
+       call xsmexp(draglib,-nimpo,1,2,impy)
      endif
      call closz(nimpo)
    endif
@@ -454,9 +455,9 @@ contains
      allocate(draglib)
      call xsmop(draglib,'drag',0,1)
      if(nexpo.gt.0) then
-       call xsmexp(draglib,nexpo,2,2,iprint)
+       call xsmexp(draglib,nexpo,2,2,impy)
      else
-       call xsmexp(draglib,-nexpo,1,2,iprint)
+       call xsmexp(draglib,-nexpo,1,2,impy)
      endif
      call closz(nexpo)
      call openz(nexpo,1)
@@ -485,9 +486,9 @@ contains
      endif
      call openz(nimpo,0)
      if(nimpo.gt.0) then
-       call xsmexp(draglib,nimpo,2,2,iprint)
+       call xsmexp(draglib,nimpo,2,2,impy)
      else
-       call xsmexp(draglib,-nimpo,1,2,iprint)
+       call xsmexp(draglib,-nimpo,1,2,impy)
      endif
      call closz(nimpo)
    endif
@@ -497,9 +498,9 @@ contains
    ! **export the xsm file
    call xsmop(draglib,'drag',2,1)
    if(nexpo.gt.0) then
-     call xsmexp(draglib,nexpo,2,1,iprint)
+     call xsmexp(draglib,nexpo,2,1,impy)
    else
-     call xsmexp(draglib,-nexpo,1,1,iprint)
+     call xsmexp(draglib,-nexpo,1,1,impy)
    endif
    call xsmcl(draglib,2)
    !
@@ -559,7 +560,7 @@ contains
        & (mth.eq.malist2(ied)))
      enddo
      if(.not.lfind) go to 50
-     if(iof+26.gt.80) then
+     if(iof+15.gt.80) then
        write(nsyso,'(1x,a80)') hline
        hline=' '
        iof=10
@@ -567,9 +568,10 @@ contains
      iof2=index(namedi(ied),' ')
      write(hline(iof:),'(a,1x)') namedi(ied)(:iof2-1)
      iof=iof+iof2
-     c1h=0.0
-     write(hline(iof:),'(1p,e11.4,'' 0.000 '')') c1h
-     iof=iof+18
+     ! the isomeric branching ratio is set to 0.0. It may be corrected before
+     ! calling dradep()
+     write(hline(iof:),'('' 0.000 '')')
+     iof=iof+7
      50 continue
    enddo
    if(iof+1.gt.80) then
@@ -646,7 +648,7 @@ contains
    use endf   ! provides endf routines and variables
    use util   ! provides error
    integer :: maxa,maxgr,maxnl,maxnz,maxtmp,maxedi,lz
-   parameter (maxa=3000,maxgr=2000,maxnl=8,maxnz=30,maxtmp=10,maxedi=17,lz=6)
+   parameter (maxa=3000,maxgr=2000,maxnl=8,maxnz=30,maxtmp=100,maxedi=17,lz=6)
    integer nendf,ngen,matno,ng,igrest,igres0,igres1,igecco,ipflag,nbesp, &
    & iesp(nbesp+1)
    real(kr) aa(6),ener(ng+1)
@@ -974,7 +976,7 @@ contains
    real(kr) ener(ng+1),eaut0,eaut1,deli,urlimit
    ! internals
    integer :: ndoubl,maxa,maxgr,maxtmp
-   parameter (ndoubl=2,maxa=2000,maxgr=2000,maxtmp=10)
+   parameter (ndoubl=2,maxa=2000,maxgr=2000,maxtmp=100)
    integer :: igar,i,ibin,ibin0,idis,ig,ig1,ig2,ilfiss,isbmat,itm,ityxsm,nb, &
    & nbfine,nbin,lssf,nbdil,ntmp,nw,loc,ndata,nunr,nbinpt
    real oldtmp(maxtmp),gar1t(maxgr),gar1s(maxgr),gar1f(maxgr),deli3(1)
@@ -2242,7 +2244,7 @@ contains
    integer :: maxa,maxiso,nreac,nfath,maxch
    parameter(maxa=10000,maxiso=4000,nreac=14,nfath=50,maxch=800)
    integer nfp,ndcy,idecay,iprint,izae,nbch,nbfiss,nbfp,nbfpch,nbiso,nw
-   real(kr) en(nfath,maxch),br(nfath,maxch)
+   real(kr) br(nfath,maxch)
    integer mylist(maxiso,3)
    character(len=4) hiso(3,maxiso)
    integer i,i1,ia,ifp,ifps,igar,ii,ile,ind,iof,ipos,iso,itext4,iz,j, &
@@ -2256,32 +2258,23 @@ contains
    !**read the specification lines for the isotopes present in the
    !  burnup chain. The specification is:
    !   [[
-   !   hich [[ hrch en br ]] /
+   !   hich [[ hrch br ]] /
    !   ]]
    !   end /
    !   where hich : character*8 name of the Draglib isotope
    !         hrch : character*8 name of a neutron induced reaction (not
    !                a scattering type reaction)
-   !         en   : energy released by the neutron induced reaction
-   !                (including the kinetic energy of the secondary neutrons)
    !         br   : branching ratio to an isomeric daughter.
    allocate(scr(maxa))
-   do iso=1,maxiso
-     mylist(iso,1)=0
-     mylist(iso,2)=0
-     mylist(iso,3)=0
-   enddo
+   mylist(:maxiso,:3)=0
    nbch=0
    nbiso=0
    do
      nbch=nbch+1
      if(nbch.gt.maxch) call error('dradep','maxch overflow',' ')
-     do i=1,nfath
-       hrch(i,nbch)=' '
-       en(i,nbch)=0.0
-       br(i,nbch)=0.0
-     enddo
-     read(nsysi,*) hich(nbch),(hrch(i,nbch),en(i,nbch),br(i,nbch),i=1,nfath)
+     hrch(:nfath,nbch)=' '
+     br(:nfath,nbch)=0.0
+     read(nsysi,*) hich(nbch),(hrch(i,nbch),br(i,nbch),i=1,nfath)
      write(6,*) 'read chain iso#',nbch,'---> ',hich(nbch)
      do i=1,nfath
        if(br(i,nbch).ne.0.0) then
@@ -2468,7 +2461,7 @@ contains
    !
    !**lump the burnup chain from nbiso to nbch isotopes
    call dralum(maxfp,nbiso,nbfiss,nbdpf,nreac,nfath,mylist(1,1),hiso, &
-   & nbch,nbfpch,hich,hrch,en,br,idreac,dener,ddeca,ipreac,prate,yield, &
+   & nbch,nbfpch,hich,hrch,br,idreac,dener,ddeca,ipreac,prate,yield, &
    & idecay,iprint)
    deallocate(yield,prate,ddeca,dener)
    deallocate(ipreac,idreac)
@@ -2769,7 +2762,7 @@ contains
    end subroutine draind
    !
    subroutine dralum(maxfp,nbiso,nbfiss,nbdpf,nreac,nfath,mylist,hiso, &
-   & nbch,nbfpch,hich,hrch,en,br,idreac,dener,ddeca,ipreac,prate,yield, &
+   & nbch,nbfpch,hich,hrch,br,idreac,dener,ddeca,ipreac,prate,yield, &
    & idecay,iprint)
    !-----------------------------------------------------------------
    !   complete and lump the burnup chain from nbiso to nbch isotopes.
@@ -2784,7 +2777,7 @@ contains
    & ipgar,iz,j0,jfath,jfp,jnd,jnd1,jnd2,jso,jz,k,knd,kreac,kso,kt,nbheav,nn, &
    & nlump,ja2,jz2,indifi
    real(kr) prgar,ymax
-   real(kr) en(nfath,nbch),br(nfath,nbch)
+   real(kr) br(nfath,nbch)
    character hrch(nfath,nbch)*8,hich(nbch)*8,hname*8,text4*4,hsmg*131
    integer mylist(nbiso),idreac(nreac,nbiso),ipreac(nfath,nbiso),istate(nstate)
    character(len=4) hiso(3,nbiso),hreac(2,maxrea),in(2)
@@ -2900,9 +2893,6 @@ contains
        endif
        if(ireac.eq.0) then
          write(hsmg,'(8hisotope ,2A4,16h has no reaction)') hiso(:2,ind)
-         call error('dralum',hsmg,' ')
-       else if(en(i,iso).ne.0.0) then
-         write(hsmg,'(8hisotope ,2A4,16h has no H-FACTOR)') hiso(:2,ind)
          call error('dralum',hsmg,' ')
        endif
        !
@@ -3215,6 +3205,18 @@ contains
      endif
    enddo
    if(ibfp.gt.0) then
+     ! check lumped fission yield normalization
+     if(iprint.gt.0) then
+       write(nsyso,'(/49h dralum: check lumped fission yield normalization)')
+       do iso=1,nbch
+         ida=ipos(iso,1)
+         if(mod(idreac(2,ida),100).ne.4) cycle
+         ifi=idreac(2,ida)/100
+         if(ifi.eq.0) cycle
+         write(nsyso,'(1x,2a4,f9.4,4h MeV,3x,f9.4,4h MeV)') hiso(:2,ida), &
+         & sum(eyiel(ifi,:ibfp))
+       enddo
+     endif
      call xsmput(draglib,'FISSIONYIELD',reshape(eyiel,(/ nbfiss*ibfp /)))
    endif
    !
