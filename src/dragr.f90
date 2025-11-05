@@ -262,7 +262,8 @@ contains
        call contio(nendf,0,0,scr,nb,nw)
        ner=n1h
        lurr=.false.
-       do i=1,ner
+       do
+         if((c1h.eq.0.0).and.(c2h.eq.0.0).and.(n1h.eq.0).and.(n2h.eq.0)) exit
          call contio(nendf,0,0,scr,nb,nw)
          if((l1h.eq.1).and.(l2h.gt.0)) then
            urlimit=c2h
@@ -387,7 +388,7 @@ contains
      call dramat(nendf,ngen,matno,ng,igrest,igres0,igres1,igecco,ipflag,nbesp, &
      & iesp,ener,lkerma)
      write(nsyso,'(/ &
-     &    '' kerma factor availability ................... '',l10)') lkerma
+     &    '' heatr kerma factor availability ............. '',l10)') lkerma
      if(nendf.ne.0) then
        ! ***construct the "isotopic specification line" for the burnup data.
        call dradat(nendf,matno,text8)
