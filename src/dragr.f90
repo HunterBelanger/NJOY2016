@@ -3214,8 +3214,7 @@ contains
          if(mod(idreac(2,ida),100).ne.4) cycle
          ifi=idreac(2,ida)/100
          if(ifi.eq.0) cycle
-         write(nsyso,'(1x,2a4,f9.4,4h MeV,3x,f9.4)') hiso(:2,ida), &
-         & sum(eyiel(ifi,:ibfp))
+         write(nsyso,'(1x,2a4,f9.4)') hiso(:2,ida),sum(eyiel(ifi,:ibfp))
        enddo
      endif
      call xsmput(draglib,'FISSIONYIELD',reshape(eyiel,(/ nbfiss*ibfp /)))
