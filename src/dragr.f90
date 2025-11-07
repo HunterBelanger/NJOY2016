@@ -979,7 +979,7 @@ contains
    integer :: ndoubl,maxa,maxgr,maxtmp
    parameter (ndoubl=2,maxa=2000,maxgr=2000,maxtmp=100)
    integer :: igar,i,ibin,ibin0,idis,ig,ig1,ig2,ilfiss,isbmat,itm,ityxsm,nb, &
-   & nbfine,nbin,lssf,nbdil,ntmp,nw,loc,ndata,nunr,nbinpt
+   & nbfine,nbin,lssf,nbdil,ntmp,nw,loc,ndata,nunr,nbinpt,irflag_2
    real oldtmp(maxtmp),gar1t(maxgr),gar1s(maxgr),gar1f(maxgr),deli3(1)
    integer nfs(maxgr),ijj(maxgr),njj(maxgr)
    real(kr) deltau,gar,em,ep,emlog,aa(6),enext,eplog,err,err1,err2,err3,err4, &
@@ -1115,15 +1115,19 @@ contains
    !
    !**recover the purr data (probability tables in the UR domain).
    lssf=0
+   irflag_2=irflag
    if(irflag.eq.1) then
+     math=matno
+     call findf(math,2,152,npen)
+     if(math.eq.-1) then
+       irflag_2=0
+       go to 40
+     endif
      allocate(erandom(nbfine))
      kk=-matno ! use a different random sequence for each isotope
      do i=1,nbfine
        erandom(i)=draran(kk)
      enddo
-     math=matno
-     call findf(math,2,152,npen)
-     if(math.eq.-1) go to 40
      call contio(npen,0,0,scr1,nb,nw)
      lssf=l1h
      call listio(npen,0,0,scr1,nb,nw)
@@ -1180,7 +1184,7 @@ contains
      ep=min(enext,bener(ibin))
      eplog=log(eaut1/ep)
      call gety1(ep,enext,idis,tp,npen,scr1)
-     if((irflag.eq.0).or.(ep.le.urlimit)) then
+     if((irflag_2.eq.0).or.(ep.le.urlimit)) then
        gar=gar+0.5d0*(tm+tp)*(emlog-eplog)
      else
        ! select a random value in the probability table
@@ -1213,7 +1217,7 @@ contains
      ep=min(enext,bener(ibin))
      eplog=log(eaut1/ep)
      call gety1(ep,enext,idis,tp,npen,scr1)
-     if((irflag.eq.0).or.(ep.le.urlimit)) then
+     if((irflag_2.eq.0).or.(ep.le.urlimit)) then
        gar=gar+0.5d0*(tm+tp)*(emlog-eplog)
      else
        ! select a random value in the probability table
@@ -1248,7 +1252,7 @@ contains
        ep=min(enext,bener(ibin))
        eplog=log(eaut1/ep)
        call gety1(ep,enext,idis,tp,npen,scr1)
-       if((irflag.eq.0).or.(ep.le.urlimit)) then
+       if((irflag_2.eq.0).or.(ep.le.urlimit)) then
          gar=gar+0.5d0*(tm+tp)*(emlog-eplog)
        else
          ! select a random value in the probability table
@@ -1266,7 +1270,7 @@ contains
        emlog=eplog
      enddo
    endif
-   if(irflag.eq.1) deallocate(scr2b,scr2a,eneurr,erandom)
+   if(irflag_2.eq.1) deallocate(scr2b,scr2a,eneurr,erandom)
    !
    !**normalization of BIN cross sections.
    allocate(gar2(ng**2))
@@ -2811,6 +2815,17 @@ contains
      call error('dralum','unable to find '//hich(iso),' ')
      10 ipos(iso,1)=j0
    enddo
+   !
+   if(iprint.gt.0) then
+     write(nsyso,'(/50h dralum: check initial fission yield normalization)')
+     do iso=1,nbch
+       ida=ipos(iso,1)
+       if(mod(idreac(2,ida),100).ne.4) cycle
+       ifi=idreac(2,ida)/100
+       if(ifi.eq.0) cycle
+       write(nsyso,'(1x,2a4,f9.4)') hiso(:2,ida),sum(yield(ifi,:maxfp))
+     enddo
+   endif
    !
    ! **complete idreac, dener, ipreac and prate.
    do iso=1,nbch
