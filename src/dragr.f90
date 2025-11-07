@@ -328,6 +328,7 @@ contains
      !
      ! ***recover energy limits for dilution-dependent xs data
      read(nsysi,*) eres0,eres1
+     if(eres0.eq.0.0d0) eres0=ener(ng+1)
      if(eres1.eq.0.0d0) eres1=ener(1)
      !
      ! ***recover thermal cutoff in eV
@@ -348,8 +349,8 @@ contains
      enddo
      write(nsyso,'(/ &
      &  '' number of thermal groups .................... '',i10/ &
-     &  '' first group of resolved resonance xs data ... '',i10/ &
-     &  '' last group of unresolved resonance xs data .. '',i10)') &
+     &  '' first group of unresolved resonance xs data . '',i10/ &
+     &  '' last group of resolved resonance xs data .... '',i10)') &
      &  igrest,igres0,igres1
      !
      ! ***validate energy mesh for option ipflag=2 (eccolib mesh)
