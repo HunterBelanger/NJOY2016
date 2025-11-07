@@ -349,7 +349,7 @@ contains
      write(nsyso,'(/ &
      &  '' number of thermal groups .................... '',i10/ &
      &  '' first group of resolved resonance xs data ... '',i10/ &
-     &  '' last group of resolved resonance xs data .... '',i10)') &
+     &  '' last group of unresolved resonance xs data .. '',i10)') &
      &  igrest,igres0,igres1
      !
      ! ***validate energy mesh for option ipflag=2 (eccolib mesh)
