@@ -138,7 +138,7 @@ contains
    & nb,nbesp,ndcy,nendf,nexpo,nfp,nimpo,npen,nw,ilong,ilong1,ityxsm,inew, &
    & irflag,idecay,iprint,ner,igar(1),impy
    logical lsame,lurr,lkerma
-   real(kr) ener(maxgr+1),eesp(maxesp+1),delecco,delig
+   real(kr) ener(maxgr+1),eesp(maxesp+1),delecco,delig,eh
    real eespi(maxesp+1),gar(1)
    real,allocatable,dimension(:) :: gar1,gar2
    real(kr),allocatable,dimension(:) :: scr
@@ -262,12 +262,14 @@ contains
        call contio(nendf,0,0,scr,nb,nw)
        ner=n1h
        lurr=.false.
+       eh=-1.0E10
        do
          if((c1h.eq.0.0).and.(c2h.eq.0.0).and.(n1h.eq.0).and.(n2h.eq.0)) exit
          call contio(nendf,0,0,scr,nb,nw)
          if((l1h.eq.1).and.(l2h.gt.0)) then
+           eh=c2h
            urlimit=c2h
-         else if(l1h.eq.2) then
+         else if(c1h.eq.eh) then
            lurr=.true.
            exit
          endif
@@ -523,8 +525,8 @@ contains
    use mainio ! provides nsysi,contio,nsyso,nsyse
    use endf   ! provides endf routines and variables
    use util   ! provides timer,openz,repoz,error
-   integer :: maxa,maxedi,lz
-   parameter(maxa=2000,maxedi=12,lz=6)
+   integer :: maxa,maxedi
+   parameter(maxa=2000,maxedi=12)
    integer nendf,matno
    character hline*80,text8*8
    integer ied,iof,iof2,iza,nb,nw
@@ -977,8 +979,8 @@ contains
    integer :: npen,matno,ng,igaut0,igaut1,irflag,iprint
    real(kr) ener(ng+1),eaut0,eaut1,deli,urlimit
    ! internals
-   integer :: ndoubl,maxa,maxgr,maxtmp
-   parameter (ndoubl=2,maxa=2000,maxgr=2000,maxtmp=100)
+   integer :: maxa,maxgr,maxtmp
+   parameter (maxa=2000,maxgr=2000,maxtmp=100)
    integer :: igar,i,ibin,ibin0,idis,ig,ig1,ig2,ilfiss,isbmat,itm,ityxsm,nb, &
    & nbfine,nbin,lssf,nbdil,ntmp,nw,loc,ndata,nunr,nbinpt,irflag_2
    real oldtmp(maxtmp),gar1t(maxgr),gar1s(maxgr),gar1f(maxgr),deli3(1)
@@ -1098,6 +1100,9 @@ contains
    call contio(npen,0,0,scr,nb,nw)
    call contio(npen,0,0,scr,nb,nw)
    temps=c1h
+   if(iprint.gt.0) then
+     write(nsyso,'(/29h drauto: process temperature=,1p,e12.4)') temps
+   endif
    call xsmlen(draglib,'TEMPERATURE',ntmp,ityxsm)
    if(ntmp.eq.0) call error('drauto','missing temperatures on xsm',' ')
    if(ntmp.gt.maxtmp) call error('drauto','oldtmp overflow',' ')
@@ -1364,12 +1369,12 @@ contains
    use util   ! provides error
    integer, intent(in) :: nendf,ngen,matno,nz0,ng,igfirs,iglast
    real(kr), intent(in) :: ytemp
-   integer :: maxa,maxgr,maxnl,maxnz,maxedi,lz,nb,nw,ngtmp,nl,nz
-   parameter (maxa=3000,maxgr=2000,maxnl=8,maxnz=30,maxedi=12,lz=6)
+   integer :: maxa,maxgr,maxnl,maxnz,maxedi,nb,nw,ngtmp,nl,nz
+   parameter (maxa=3000,maxgr=2000,maxnl=8,maxnz=30,maxedi=12)
    integer ied,ig,igmax,iz,nztmp
    logical lfind,exist,lfiss
    real(kr) kap
-   character cd*4,hsmg*131
+   character cd*4
    integer,save,dimension(maxedi) :: malist1= &
    & (/ 16, 17, 18, 28, 37,102,103,104,105,106,107,108 /)
    integer,save,dimension(maxedi) :: malist2= &
@@ -1768,7 +1773,7 @@ contains
    integer i,ig,ig1,ig2,igar,igmax,igmin,il,imat,imax,imt,iz,loc,nb,ng, &
    & ngther,nl,nl2,nlgar,nw,nz,nze
    real(kr) ytemp,aa(6),delta,dgar,garmax
-   real gar(maxgar)
+   real,allocatable,dimension(:) :: gar
    real(kr),allocatable,dimension(:) :: scr
    real(kr),allocatable,dimension(:,:,:) :: flux
    real(kr),allocatable,dimension(:,:,:,:) :: rm,sigsm
@@ -1777,7 +1782,7 @@ contains
    & 70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91 /)
    !
    ! scratch storage allocation
-   allocate(scr(maxa))
+   allocate(scr(maxa),gar(maxgar))
    allocate(rm(maxgr,maxgr,maxnl,maxnz),flux(maxgr,maxnl,maxnz), &
    & sigsm(maxgr,maxgr,maxnl,maxnz))
    !
@@ -2025,7 +2030,7 @@ contains
    !
    ! scratch storage deallocation
    deallocate(sigsm,flux,rm)
-   deallocate(scr)
+   deallocate(gar,scr)
    return
    end subroutine drasc
    !
@@ -2250,16 +2255,16 @@ contains
    integer :: maxa,maxiso,nreac,nfath,maxch
    parameter(maxa=10000,maxiso=4000,nreac=14,nfath=50,maxch=800)
    integer nfp,ndcy,idecay,iprint,izae,nbch,nbfiss,nbfp,nbfpch,nbiso,nw
-   real(kr) br(nfath,maxch)
    integer mylist(maxiso,3)
    character(len=4) hiso(3,maxiso)
    integer i,i1,ia,ifp,ifps,igar,ii,ile,ind,iof,ipos,iso,itext4,iz,j, &
    & jpos,k,lep1,loc,maxfp,nb,nbdpf
    real(kr) awr,energy,za
-   character hname*8,hsmg*72,hich(maxch)*8,hrch(nfath,maxch)*8,text4*4
+   character hname*8,hsmg*72,hich(maxch)*8,text4*4
    integer,allocatable,dimension(:,:) :: idreac,ipreac
    real(kr),allocatable,dimension(:) :: ddeca,scr
-   real(kr),allocatable,dimension(:,:) :: dener,prate,yield
+   real(kr),allocatable,dimension(:,:) :: br,dener,prate,yield
+   character(len=8),allocatable,dimension(:,:) :: hrch
    !
    !**read the specification lines for the isotopes present in the
    !  burnup chain. The specification is:
@@ -2271,7 +2276,7 @@ contains
    !         hrch : character*8 name of a neutron induced reaction (not
    !                a scattering type reaction)
    !         br   : branching ratio to an isomeric daughter.
-   allocate(scr(maxa))
+   allocate(scr(maxa),br(nfath,maxch),hrch(nfath,maxch))
    mylist(:maxiso,:3)=0
    nbch=0
    nbiso=0
@@ -2471,7 +2476,7 @@ contains
    & idecay,iprint)
    deallocate(yield,prate,ddeca,dener)
    deallocate(ipreac,idreac)
-   deallocate(scr)
+   deallocate(hrch,br,scr)
    return
    end subroutine dradep
    !
@@ -2487,8 +2492,8 @@ contains
    integer :: maxa,maxen,lz
    parameter(maxa=10000,maxen=4,lz=6)
    integer maxfp,nbiso,nbfiss,nbdpf,nreac,nfath,nfp,ndcy,i,ia,idy,ifath, &
-   & ifiss,ifp,ifpp,ifps,ifpss,ile,ind,iof,ipf,ireac,iso,iz,iza,izae,ja, &
-   & jnd,jz,jzae,lep1,loc,nb,nbdy,nbfp,nw
+   & ifiss,ifp,ifpp,ifps,ifpss,ile,ind,iof,iz,iza,izae,ja,jnd,jz,jzae,lep1, &
+   & loc,nb,nbdy,nbfp,nw
    real(kr) summ,za,rtyp
    integer mylist(nbiso),idreac(nreac,nbiso),ipreac(nfath,nbiso)
    real(kr) awr,energy,dener(nreac,nbiso),ddeca(nbiso),prate(nfath,nbiso), &
@@ -2780,7 +2785,7 @@ contains
    parameter (maxrea=14,nstate=40,maxit=20)
    integer maxfp,nbiso,nbfiss,nbdpf,nreac,nbch,nbfpch,idecay,iprint,ireac, &
    & iter,iso,isoo,i,j,ia,ja,ibfp,ida,ifa,ifath,ifi,ifp,ifps,iii,im,ind, &
-   & ipgar,iz,j0,jfath,jfp,jnd,jnd1,jnd2,jso,jz,k,knd,kreac,kso,kt,nbheav,nn, &
+   & ipgar,iz,j0,jfath,jfp,jnd,jnd1,jnd2,jso,jz,k,knd,kreac,kt,nbheav,nn, &
    & nlump,ja2,jz2,indifi
    real(kr) prgar,ymax
    real(kr) br(nfath,nbch)
