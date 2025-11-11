@@ -151,6 +151,7 @@ program njoy
    real(kr)::secs
 
    !--set page size for blocked binary mode in module endf
+   npage=306
    npage=(npage/102)*102
 
    !--open the NJOY listing file
@@ -282,4 +283,3 @@ program njoy
    write(nsyse,'(69x,f8.1,''s''/1x,77(''*''))') secs
 
 end program njoy
-
