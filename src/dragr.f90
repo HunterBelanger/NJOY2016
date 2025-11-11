@@ -3439,6 +3439,9 @@ contains
      if(ep.ge.eneurr(i)) then
        iunr=i
        go to 10
+     else if((i.eq.1).and.(ep.ge.eneurr(1)-1.0e-2)) then
+       iunr=i
+       go to 10
      endif
    enddo
    write(hsmg,'(7henergy=,1p,e12.4,12h outside urr)') ep
