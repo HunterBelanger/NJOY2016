@@ -3441,7 +3441,8 @@ contains
        go to 10
      endif
    enddo
-   call error('draurr','failed',' ')
+   write(hsmg,'(7henergy=,1p,e12.4,12h outside urr)') ep
+   call error('draurr',hsmg,' ')
    10 siginf=scr2a(nbdil+(iunr-1)*(1+5*nbdil)+(ityp-1)*nbdil+2)
    iof=1+(iunr-1)*(1+6*nbinpt)
    www(:nbinpt)=scr2b(iof+1:iof+nbinpt)
