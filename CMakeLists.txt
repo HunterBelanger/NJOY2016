@@ -176,7 +176,8 @@ add_library( njoy ${njoy_library_linkage}
              "${CMAKE_CURRENT_SOURCE_DIR}/src/filem.f90"
              "${CMAKE_CURRENT_SOURCE_DIR}/src/kdim.f90"
              "${CMAKE_CURRENT_SOURCE_DIR}/src/xsmm.f90"
-             "${CMAKE_CURRENT_SOURCE_DIR}/src/dragr.f90" )
+             "${CMAKE_CURRENT_SOURCE_DIR}/src/dragr.f90"
+             "${CMAKE_CURRENT_SOURCE_DIR}/src/calenr.f90" )
 
 target_include_directories( njoy PUBLIC "${CMAKE_Fortran_MODULE_DIRECTORY}" )
 

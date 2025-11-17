@@ -80,6 +80,8 @@ program njoy
 ! dragr....convert multigroup data into libraries for the lattice
 !          code Dragon.
 !
+! calenr...add CALENDF probability tables to the GENDF tape.
+!
 ! Each processing module is implemented as a Fortran-90 module with
 ! only one public subroutine named as above.  The modules have the
 ! names as given above with "m" instead of "r".  Processing modules
@@ -142,6 +144,7 @@ program njoy
    use leapm   ! provides leapr
    use gaspm   ! provides gaspr
    use dragm   ! provides dragr
+   use calenm  ! provides calenr
 
    implicit none
    character(6)::module
@@ -268,6 +271,9 @@ program njoy
 
       case('dragr')  ! produce libraries for Dragon
          call dragr
+
+      case('calenr') ! generate CALENDF probability tables
+         call calenr
 
       case ('--')    ! comment card; nothing to do
 
