@@ -661,7 +661,7 @@ contains
    real awr(1),dilut(maxnz),olddil(maxnz),oldtmp(maxtmp),vector(maxgr)
    integer igfirs(maxnl),iglast(maxnl)
    integer ied,ig,ig1,ig2,igmax,il,ilong,ityxsm,imt,isbmat,itm,itm0,iz,iz0, &
-   & loc,nb,ng0,nl,nl2,nlgar,ntmp,nw,nz,nz0,nz0bis,nzgar
+   & loc,nb,ng0,nl,nl2,nlgar,ntmp,nw,nz,nz0,nz0bis,nzgar,alloc_ok
    real(kr) temps(maxtmp),ytemp,kap,kap2
    integer, save, dimension(maxedi) :: malist= &
    & (/ 1,2,4,5,16,17,18,28,37,102,103,104,105,106,107,108,301 /)
@@ -676,7 +676,9 @@ contains
    ! scratch storage allocation
    allocate(scr(maxa))
    allocate(deltau(maxgr),rv2(maxgr,maxnl,1),flux(maxgr,maxnl,maxnz), &
-   & rv(maxgr,maxnl,maxnz),rm2(maxgr,maxgr,maxnl,1))
+   & rv(maxgr,maxnl,maxnz))
+   allocate(rm2(maxgr,maxgr,maxnl,1),stat=alloc_ok)
+   if(alloc_ok /= 0) call error('dramat','unable to allocate rm2',' ')
    !
    ! recover the new dilution values.
    call findf(matno,1,451,ngen)
@@ -1492,7 +1494,7 @@ contains
    character text2*2,cd*4
    real(kr) aa(6),ssum(maxdel),vsum(maxgr)
    integer idel,ig,ig1,ig2,igmax,il,isp,iz,jg,loc,nb,ndel,nf,ng,ng2, &
-   & nl,nw,nz,nz2,nzm,nzv
+   & nl,nw,nz,nz2,nzm,nzv,alloc_ok
    real(kr) all
    real gar1(maxdel),gar2(maxgr)
    integer, save, dimension(4) :: mflist= (/ 19,20,21,38 /)
@@ -1503,7 +1505,10 @@ contains
    allocate(scr(maxa))
    allocate(rv(maxgr,maxnl,maxnz),sigf(maxgr,maxnl,maxnz), &
    & flux(maxgr,maxnl,maxnz),chidel(maxgr,maxdel),sigf2(maxgr,maxnz))
-   allocate(sigfm(maxgr,maxgr,maxnl,maxnz),sigfm2(maxgr,maxgr,maxnl,maxnz))
+   allocate(sigfm(maxgr,maxgr,maxnl,maxnz),stat=alloc_ok)
+   if(alloc_ok /= 0) call error('drafis','unable to allocate sigfm',' ')
+   allocate(sigfm2(maxgr,maxgr,maxnl,maxnz),stat=alloc_ok)
+   if(alloc_ok /= 0) call error('drafis','unable to allocate sigfm2',' ')
    !
    ! initialize the sigf and sigfm arrays.
    sigf(:maxgr,:maxnl,:maxnz)=0.0
@@ -1771,7 +1776,7 @@ contains
    logical exist,exist2,exist3,lfind
    character cd*4,cdl*2
    integer i,ig,ig1,ig2,igar,igmax,igmin,il,imat,imax,imt,iz,loc,nb,ng, &
-   & ngther,nl,nl2,nlgar,nw,nz,nze
+   & ngther,nl,nl2,nlgar,nw,nz,nze,alloc_ok
    real(kr) ytemp,aa(6),delta,dgar,garmax
    real,allocatable,dimension(:) :: gar
    real(kr),allocatable,dimension(:) :: scr
@@ -1783,8 +1788,12 @@ contains
    !
    ! scratch storage allocation
    allocate(scr(maxa),gar(maxgar))
-   allocate(rm(maxgr,maxgr,maxnl,maxnz),flux(maxgr,maxnl,maxnz), &
-   & sigsm(maxgr,maxgr,maxnl,maxnz))
+   allocate(rm(maxgr,maxgr,maxnl,maxnz),stat=alloc_ok)
+   if(alloc_ok /= 0) call error('drasc','unable to allocate rm',' ')
+   allocate(flux(maxgr,maxnl,maxnz),stat=alloc_ok)
+   if(alloc_ok /= 0) call error('drasc','unable to allocate flux',' ')
+   allocate(sigsm(maxgr,maxgr,maxnl,maxnz),stat=alloc_ok)
+   if(alloc_ok /= 0) call error('drasc','unable to allocate sigsm',' ')
    !
    ! recover the number of thermal-corrected groups (ngther).
    ngther=0
