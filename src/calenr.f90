@@ -245,6 +245,7 @@ contains
    subroutine calhd(ngn,matd,ng,maxgr,ener)
    !-----------------------------------------------------------------
    ! recover energy group data from gendf tape
+   ! Group 1 is the most thermal group.
    !-----------------------------------------------------------------
    use endf   ! provides endf routines and variables
    use util   ! provides error
@@ -270,20 +271,20 @@ contains
    ng=nint(scr(3))
    if(ng.gt.maxgr) call error('calhd','maxgr overflow',' ')
    do ig=1,ng+1
-     ener(ng-ig+2)=scr(7+nz+ig)
+     ener(ig)=scr(7+nz+ig)
    enddo
    deallocate(scr)
    return
    end subroutine calhd
    !
-   subroutine calurr(maxnor,ig,nbinpt,nunr,nbdil,npar,lssf,ep,eneurr,scr2a, &
+   subroutine calurr(maxnor,nbinpt,nunr,nbdil,npar,lssf,ep,eneurr,scr2a, &
    & scr2b,factor,momt,momp,ndil,dilut,sefr)
    !-------------------------------------------------------------------
    ! Compute cross section moments in the unresolved resonance rang
    !-------------------------------------------------------------------
    use util ! provides error
    ! externals
-   integer :: maxnor,ig,nbinpt,nunr,nbdil,npar,lssf,ndil
+   integer :: maxnor,nbinpt,nunr,nbdil,npar,lssf,ndil
    real(kr) :: ep,eneurr(nunr),scr2a(nbdil+(1+5*nbdil)*nunr), &
    & scr2b((1+6*nbinpt)*nunr),factor,momt(2*maxnor),momp(maxnor,npar), &
    & dilut(ndil),sefr(npar+2,ndil)
@@ -395,15 +396,15 @@ contains
    ! ***compute igres0 and igres1
    igres0=1
    igres1=ng
-   do ig=1,ng
-     if(eres1.le.1.001d0*ener(ig+1)) igres0=ig+1
-   enddo
    do ig=ng+1,2,-1
-     if(eres0.ge.0.999d0*ener(ig)) igres1=ig-1
+     if(eres1.le.0.999d0*ener(ig+1)) igres1=ig-1
+   enddo
+  do ig=1,ng
+     if(eres0.ge.1.001d0*ener(ig)) igres0=ig+1
    enddo
    write(nsyso,'(/ &
-   &  '' first group of unresolved resonance xs data . '',i10/ &
-   &  '' last group of resolved resonance xs data .... '',i10)') &
+   &  '' first group of resolved resonance xs data ... '',i10/ &
+   &  '' last group of unresolved resonance xs data .. '',i10)') &
    &  igres0,igres1
    !
    !**recover the temperature values.
@@ -504,15 +505,15 @@ contains
    allocate(ekep(2,maxbin)) ! allocate the big array containing sigt values
    iener=1
    ekep(1,1)=em ; ekep(2,1)=tm
-   ig=ng
+   ig=1
    momt(:2*maxnor,:ng)=0.0d0
    momp(:maxnor,:npar,:ng)=0.0d0
    sefr(:npar+2,:ndil,:ng)=0.0d0
    npanel(:ng)=0
    emlog=log(eres1/em)
    do while(ep*(1.0d0+1.0d-6).lt.eres1)
-     if(ig.le.0) call error('calpt','invalid index',' ')
-     ep=min(enext,ener(ig))
+     if(ig.gt.ng) call error('calpt','invalid index',' ')
+     ep=min(enext,ener(ig+1))
      eplog=log(eres1/ep)
      call gety1(ep,enext,idis,tp,npendf,scr1)
      if((irflag_2.eq.0).or.(ep.le.urlimit)) then
@@ -542,10 +543,10 @@ contains
      else
        npanel(ig)=-1
        factor=emlog-eplog
-       call calurr(maxnor,ig,nbinpt,nunr,nbdil,npar,lssf,ep,eneurr,scr2a,&
-       & scr2b, factor,momt(1,ig),momp(1,1,ig),ndil,dilut,sefr(1,1,ig))
+       call calurr(maxnor,nbinpt,nunr,nbdil,npar,lssf,ep,eneurr,scr2a, &
+       & scr2b,factor,momt(1,ig),momp(1,1,ig),ndil,dilut,sefr(1,1,ig))
      endif
-     if(ep.eq.ener(ig)) ig=ig-1
+     if(ep.eq.ener(ig+1)) ig=ig+1
      em=ep ; tm=tp ; sm=sp
      emlog=eplog
    enddo
@@ -559,11 +560,11 @@ contains
    call gety1(em,enext,idis,tm,npendf,scr1)
    iener=1
    sm=ekep(2,1)
-   ig=ng
+   ig=1
    emlog=log(eres1/em)
    do while(ep*(1.0d0+1.0d-6).lt.eres1)
-     if(ig.le.0) call error('calpt','invalid index',' ')
-     ep=min(enext,ener(ig))
+     if(ig.gt.ng) call error('calpt','invalid index',' ')
+     ep=min(enext,ener(ig+1))
      eplog=log(eres1/ep)
      call gety1(ep,enext,idis,tp,npendf,scr1)
      if((irflag_2.eq.0).or.(ep.le.urlimit)) then
@@ -588,7 +589,7 @@ contains
          sefr(3,idil,ig)=sefr(3,idil,ig)+factor*sigx
        enddo
      endif
-     if(ep.eq.ener(ig)) ig=ig-1
+     if(ep.eq.ener(ig+1)) ig=ig+1
      em=ep ; tm=tp ; sm=sp
      emlog=eplog
    enddo
@@ -612,11 +613,11 @@ contains
      call gety1(em,enext,idis,tm,npendf,scr1)
      iener=1
      sm=ekep(2,1)
-     ig=ng
+     ig=1
      emlog=log(eres1/em)
      do while(ep*(1.0d0+1.0d-6).lt.eres1)
-       if(ig.le.0) call error('calpt','invalid index',' ')
-       ep=min(enext,ener(ig))
+       if(ig.gt.ng) call error('calpt','invalid index',' ')
+       ep=min(enext,ener(ig+1))
        eplog=log(eres1/ep)
        call gety1(ep,enext,idis,tp,npendf,scr1)
        if((irflag_2.eq.0).or.(ep.le.urlimit)) then
@@ -641,7 +642,7 @@ contains
            sefr(4,idil,ig)=sefr(4,idil,ig)+factor*sigx
          enddo
        endif
-       if(ep.eq.ener(ig)) ig=ig-1
+       if(ep.eq.ener(ig+1)) ig=ig+1
        em=ep ; tm=tp ; sm=sp
        emlog=eplog
      enddo
@@ -656,11 +657,11 @@ contains
    call gety1(em,enext,idis,tm,npendf,scr1)
       iener=1
       sm=ekep(2,1)
-   ig=ng
+   ig=1
    emlog=log(eres1/em)
    do while(ep*(1.0d0+1.0d-6).lt.eres1)
-     if(ig.le.0) call error('calpt','invalid index',' ')
-     ep=min(enext,ener(ig))
+     if(ig.gt.ng) call error('calpt','invalid index',' ')
+     ep=min(enext,ener(ig+1))
      eplog=log(eres1/ep)
      call gety1(ep,enext,idis,tp,npendf,scr1)
      if((irflag_2.eq.0).or.(ep.le.urlimit)) then
@@ -685,7 +686,7 @@ contains
          sefr(5,idil,ig)=sefr(5,idil,ig)+factor*sigx
        enddo
      endif
-     if(ep.eq.ener(ig)) ig=ig-1
+     if(ep.eq.ener(ig+1)) ig=ig+1
      em=ep ; tm=tp ; sm=sp
      emlog=eplog
    enddo
@@ -699,7 +700,7 @@ contains
      & 5horder,7x,5herror)') matno,temps
    endif
    do ig=igres0,igres1
-     deltau=log(ener(ig)/ener(ig+1))
+     deltau=log(ener(ig+1)/ener(ig))
      do inor=1,2*maxnor
        momt(inor,ig)=momt(inor,ig)/deltau
      enddo
@@ -739,7 +740,7 @@ contains
          mth=602 ! radiative capture
        endif
        write(nsyso,'(/51h calpt: normalization of probability tables for mt=, &
-       & i4/8x,5hgendf,5x,7hcalendf,6x,6hfactor)') mth
+       & i4/13x,5hgendf,5x,7hcalendf,6x,6hfactor)') mth
      endif
      do ig=igres0,igres1
        sigt=0.d0
@@ -752,8 +753,8 @@ contains
          factor=1.d0
        endif
        prosig(:nor(ig),ipar,ig)=prosig(:nor(ig),ipar,ig)*factor
-       if(iprint.gt.0) write(nsyso,'(1x,1p,3e12.4)') proref(ig,ipar-1,isbmat), &
-       & sigt,factor
+       if(iprint.gt.0) write(nsyso,'(1x,i5,1p,3e12.4)') &
+       & ig,proref(ig,ipar-1,isbmat),sigt,factor
      enddo
    enddo
    !
@@ -1652,6 +1653,7 @@ contains
    subroutine cfvect(maxgr,maxnl,maxnz,nin,matd,mt,ytemp,ng,nl,nz,rv,flux,exist)
    !-----------------------------------------------------------------
    !   utility routine for recovering a vector reaction from a gendf tape.
+   !   Group 1 is the most thermal group.
    !   input parameters:
    !   maxgr   first dimension of vector rv. Maximum number of energy groups.
    !   maxnl   second dimension of vector rv. Maximum number of Legendre orders.
@@ -1673,8 +1675,7 @@ contains
    use util   ! provides timer,openz,repoz,error
    integer :: maxa,lz
    parameter (maxa=2000,lz=6)
-   integer maxgr,maxnl,maxnz,nin,matd,mt,ng,nl,nz,ig,il,iz,jg,loc,locf,nb, &
-   & ng2, nw
+   integer maxgr,maxnl,maxnz,nin,matd,mt,ng,nl,nz,ig,il,iz,loc,locf,nb,ng2,nw
    logical exist,lfind
    real(kr) ytemp,rv(maxgr,maxnl,maxnz),flux(maxgr,maxnl,maxnz),aa(6)
    real(kr),allocatable,dimension(:) :: scr
@@ -1713,6 +1714,7 @@ contains
      if(.not.lfind) call listio(nin,0,0,scr(1),nb,nw)
      ng2=l1h
      ig=n2h
+     if(ig.eq.0) exit
      lfind=.false.
      loc=1+nw
      do while (nb.ne.0)
@@ -1721,12 +1723,11 @@ contains
        call moreio(nin,0,0,scr(loc),nb,nw)
        loc=loc+nw
      enddo
-     jg=ng-ig+1
      do il=1,nl
        do iz=1,nz
          locf=1+lz+nl*(iz-1)+(il-1)
-         flux(jg,il,iz)=scr(locf)
-         rv(jg,il,iz)=scr(locf+nl*nz)
+         flux(ig,il,iz)=scr(locf)
+         rv(ig,il,iz)=scr(locf+nl*nz)
        enddo
      enddo
    enddo
