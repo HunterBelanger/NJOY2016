@@ -1802,7 +1802,7 @@ contains
    use util   ! provides timer,openz,repoz,error
    integer :: maxa,maxgr,maxnl,maxnz,maxmat,maxgar
    parameter (maxa=2000)
-   parameter(maxgr=2000,maxnl=8,maxnz=30,maxmat=46,maxgar=maxgr*maxgr)
+   parameter(maxgr=2000,maxnl=8,maxnz=30,maxmat=47,maxgar=maxgr*maxgr)
    integer nin,matd,nz0,igrest,igecco,ijj(maxgr),njj(maxgr),igfirs(maxnl), &
    & iglast(maxnl),ipflag
    logical exist,exist2,exist3,lfind
@@ -1815,8 +1815,8 @@ contains
    real(kr),allocatable,dimension(:,:,:) :: flux
    real(kr),allocatable,dimension(:,:,:,:) :: rm,sigsm
    integer,save,dimension(maxmat) :: mtlist= &
-   & (/ 2,5,16,17,37,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,&
-   & 70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91 /)
+   & (/ 2,5,16,17,28,37,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68, &
+   & 69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91 /)
    !
    ! scratch storage allocation
    allocate(scr(maxa),gar(maxgar))
