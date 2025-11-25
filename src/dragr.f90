@@ -651,24 +651,40 @@ contains
    !-----------------------------------------------------------------
    use endf   ! provides endf routines and variables
    use util   ! provides error
-   integer :: maxa,maxgr,maxnl,maxnz,maxtmp,maxedi,lz
-   parameter (maxa=3000,maxgr=2000,maxnl=8,maxnz=30,maxtmp=100,maxedi=17,lz=6)
+   integer :: maxa,maxgr,maxnl,maxnz,maxtmp,maxedi,maxedi2,lz
+   parameter (maxa=3000,maxgr=2000,maxnl=8,maxnz=30,maxtmp=100,maxedi=17, &
+   & maxedi2=57,lz=6)
    integer nendf,ngen,matno,ng,igrest,igres0,igres1,igecco,ipflag,nbesp, &
    & iesp(nbesp+1)
    real(kr) aa(6),ener(ng+1)
    logical lkerma,lfind,lover,exist,exist2,exist3,lfiss
-   character cd*4,hsmg*131
+   character cd*4,hsmg*131,hmt*8
    real awr(1),dilut(maxnz),olddil(maxnz),oldtmp(maxtmp),vector(maxgr)
    integer igfirs(maxnl),iglast(maxnl)
    integer ied,ig,ig1,ig2,igmax,il,ilong,ityxsm,imt,isbmat,itm,itm0,iz,iz0, &
-   & loc,nb,ng0,nl,nl2,nlgar,ntmp,nw,nz,nz0,nz0bis,nzgar,alloc_ok
+   & loc,nb,ng0,nl,nl2,nlgar,ntmp,nw,nz,nz0,nz0bis,nzgar,ned,alloc_ok
    real(kr) temps(maxtmp),ytemp,kap,kap2
    integer, save, dimension(maxedi) :: malist= &
    & (/ 1,2,4,5,16,17,18,28,37,102,103,104,105,106,107,108,301 /)
+   integer, save, dimension(maxedi2) :: malist2= &
+   & (/ 1,2,5,16,17,18,28,37,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66, &
+   & 67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90, &
+   & 91,102,103,104,105,106,107,108,301 /)
    character(len=8), save, dimension(maxedi) :: namedi= &
    & (/ 'NTOT0   ','NELAS   ','NINEL   ','NX      ','N2N     ','N3N     ', &
    &    'NFTOT   ','NNP     ','N4N     ','NG      ','NP      ','ND      ', &
    &    'NT      ','NHE3    ','NA      ','N2A     ','H-FACTOR'/)
+   character(len=8), save, dimension(maxedi2) :: namedi2= &
+   & (/ 'NTOT0   ','NELAS   ','NX      ','N2N     ','N3N     ','NFTOT   ', &
+   &    'NNP     ','N4N     ','NINEL001','NINEL002','NINEL003','NINEL004', &
+   &    'NINEL005','NINEL006','NINEL007','NINEL008','NINEL009','NINEL010', &
+   &    'NINEL011','NINEL012','NINEL013','NINEL014','NINEL015','NINEL016', &
+   &    'NINEL017','NINEL018','NINEL019','NINEL020','NINEL021','NINEL022', &
+   &    'NINEL023','NINEL024','NINEL025','NINEL026','NINEL027','NINEL028', &
+   &    'NINEL029','NINEL030','NINEL031','NINEL032','NINEL033','NINEL034', &
+   &    'NINEL035','NINEL036','NINEL037','NINEL038','NINEL039','NINEL040', &
+   &    'NINEL041','NG      ','NP      ','ND      ','NT      ','NHE3    ', &
+   &    'NA      ','N2A     ','H-FACTOR'/)
    real(kr),allocatable,dimension(:) :: scr,deltau
    real(kr),allocatable,dimension(:,:,:) :: rv2,rv3,rv4,flux,rv
    real(kr),allocatable,dimension(:,:,:,:) :: rm2
@@ -843,22 +859,36 @@ contains
      lfiss=.false.
      igfirs(:maxnl)=0
      iglast(:maxnl)=0
-     do ied=1,maxedi
+     if(igecco.eq.0) then
+       ned=maxedi
+     else
+       ned=maxedi2
+     endif
+     do ied=1,ned
        !  ***process x-sections for reaction malist(ied).
-       call fvect(maxgr,maxnl,maxnz,ngen,matno,malist(ied),ytemp,ng0, &
-       & nl,nzgar,rv,flux,exist)
+       if(igecco.eq.0) then
+         ! store the sum of inelastic scattering channels
+         imt=malist(ied)
+         hmt=namedi(ied)
+       else
+         ! store all channels of inelastic scattering (used for eccolibs)
+         imt=malist2(ied)
+         hmt=namedi2(ied)
+       endif
+       call fvect(maxgr,maxnl,maxnz,ngen,matno,imt,ytemp,ng0,nl,nzgar,rv,flux, &
+       & exist)
        if(.not.exist) cycle
        if(ng0.ne.ng) call error('dramat','inconsistent ng(2).',' ')
-       if(malist(ied).eq.18) lfiss=.true.
+       if(imt.eq.18) lfiss=.true.
        !
-       if((malist(ied).le.2).and.exist3) then
+       if((imt.le.2).and.exist3) then
          ! ***perform thermal correction on 'NTOT0' and 'NELAS' x-sections.
          do iz=1,nzgar
            do ig=1,ng
              rv(ig,1,iz)=rv(ig,1,iz)+rv2(ig,1,1)
            enddo
          enddo
-       else if(malist(ied).eq.301) then
+       else if(imt.eq.301) then
          ! ***add H-FACTOR information on Draglib based on heatr kermas.
          lkerma=.true.
          allocate(rv3(maxgr,maxnl,maxnz),rv4(maxgr,maxnl,maxnz))
@@ -907,7 +937,7 @@ contains
        60 do ig=1,igmax
          vector(ig)=real(rv(ig,1,1))
        enddo
-       call xsmput(draglib,namedi(ied),vector(1:igmax))
+       call xsmput(draglib,hmt,vector(1:igmax))
        if(nzgar.eq.1) cycle
        !
        ! ***find the last self-shielded group.
@@ -920,12 +950,14 @@ contains
          call xsmsix(draglib,'SUBMAT'//cd,1)
          !
          ! ***process finite dilution x-sections
-         do ig=1,iglast(1)-1
-           vector(ig)=0.0
+         vector(1:iglast(1)-1)=0.0
+         igmax=ng
+         do ig=iglast(1)-1,igfirs(1),-1
+           igmax=ig
+           if((flux(ig,1,1).ne.0.0).or.(rv(ig,1,1).ne.0.0)) go to 70
          enddo
-         do ig=igfirs(1),iglast(1)-1
-           if(flux(ig,1,1).eq.0.0) cycle
-           if(rv(ig,1,1).eq.0.0) cycle
+         go to 80
+         70 do ig=igfirs(1),igmax
            flux(ig,1,nz-iz+1)=flux(ig,1,nz-iz+1)/flux(ig,1,1)
            if(flux(ig,1,nz-iz+1).gt.10.0) then
              write(hsmg,'(19hinconsistent flux (,1p,e10.3,5h) in , &
@@ -935,11 +967,11 @@ contains
            endif
            vector(ig)=real(rv(ig,1,nz-iz+1)*flux(ig,1,nz-iz+1)-rv(ig,1,1))
          enddo
-         call xsmput(draglib,namedi(ied),vector(1:iglast(1)-1))
+         call xsmput(draglib,hmt,vector(1:iglast(1)-1))
          !
-         if(ied.eq.1) then
+         80 if(ied.eq.1) then
            ! ***process 'NWT0' finite dilution fluxes
-           do ig=igfirs(1),iglast(1)-1
+           do ig=igfirs(1),igmax
              vector(ig)=real(flux(ig,1,nz-iz+1)-1.0d0)
            enddo
            call xsmput(draglib,'NWT0',vector(1:iglast(1)-1))
@@ -1316,8 +1348,10 @@ contains
      fact2=gar1s(ig)*(sum1/sum3)
      fact3=0.0
      if((ilfiss.gt.0).and.(sum4.gt.0.0)) fact3=gar1f(ig)*(sum1/sum4)
-     write(nsyso,'(''Autolib normalization in group'',i5,'':'',3f7.4)') ig, &
-     & fact1,fact2,fact3
+     if(iprint.gt.0) then
+       write(nsyso,'('' Autolib normalization in group'',i5,'':'',3f7.4)') &
+       & ig,fact1,fact2,fact3
+     endif
      do ibin=ibin0+1,ibin0+nfs(ig)
        bsig1(ibin)=fact1*bsig1(ibin)
        bsig2(ibin)=fact2*bsig2(ibin)
@@ -1331,12 +1365,12 @@ contains
      bgar(ibin)=real(bsig1(ibin))
    enddo
    call xsmput(draglib,'BIN-NTOT0',bgar(1:nbfine))
-   if((isbmat.eq.1).and.(iprint.gt.0)) then
-     write(nsyso,'(''-----------------------------------'')')
+   if((isbmat.eq.1).and.(iprint.gt.1)) then
+     write(nsyso,'('' -----------------------------------'')')
      write(nsyso,100) (ener(i),i=igaut0,igaut1+1)
-     write(nsyso,'(''--BIN-ENERGY-----------------------'')')
+     write(nsyso,'('' --BIN-ENERGY-----------------------'')')
      write(nsyso,100) (bener(i),i=1,nbfine+1)
-     write(nsyso,'(''--BIN-NTOT0------------------------'')')
+     write(nsyso,'('' --BIN-NTOT0------------------------'')')
      write(nsyso,100) (bsig1(i),i=1,nbfine),bsig1(nbfine)
    endif
    do ibin=1,nbfine
@@ -1627,9 +1661,7 @@ contains
      do iz=1,nz-1
        !
        ! ***process finite dilution x-sections
-       do ig=1,iglast-1
-         gar2(ig)=0.0
-       enddo
+       gar2(1:iglast-1)=0.0
        do ig=igfirs,iglast-1
          if(sigf(ig,1,1).eq.0.0) cycle
          gar2(ig)=real(rv(ig,1,1)*ssum(idel)*(sigf(ig,1,nz-iz+1)* &
