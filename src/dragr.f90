@@ -266,7 +266,10 @@ contains
        do
          if((c1h.eq.0.0).and.(c2h.eq.0.0).and.(n1h.eq.0).and.(n2h.eq.0)) exit
          call contio(nendf,0,0,scr,nb,nw)
-         if((l1h.eq.1).and.(l2h.gt.0)) then
+         if((l1h.eq.0).and.(l2h.eq.0)) then
+           urlimit=c2h
+           exit
+         else if((l1h.eq.1).and.(l2h.gt.0)) then
            eh=c2h
            urlimit=c2h
          else if(c1h.eq.eh) then
@@ -1815,8 +1818,8 @@ contains
    real(kr),allocatable,dimension(:,:,:) :: flux
    real(kr),allocatable,dimension(:,:,:,:) :: rm,sigsm
    integer,save,dimension(maxmat) :: mtlist= &
-   & (/ 2,5,16,17,28,37,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68, &
-   & 69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91 /)
+   & (/ 2,5,16,17,28,37,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67, &
+   & 68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91 /)
    !
    ! scratch storage allocation
    allocate(scr(maxa),gar(maxgar))

@@ -151,7 +151,10 @@ contains
        do
          if((c1h.eq.0.0).and.(c2h.eq.0.0).and.(n1h.eq.0).and.(n2h.eq.0)) exit
          call contio(nendf,0,0,scr,nb,nw)
-         if((l1h.eq.1).and.(l2h.gt.0)) then
+         if((l1h.eq.0).and.(l2h.eq.0)) then
+           urlimit=c2h
+           exit
+         else if((l1h.eq.1).and.(l2h.gt.0)) then
            eh=c2h
            urlimit=c2h
          else if(c1h.eq.eh) then
@@ -190,6 +193,7 @@ contains
          else if(npendf.gt.0) then
            read(npendf,'(6e11.0,i4,i2,i3,i5)',end=20) aa,math,mfh,mth,nsp
          endif
+         if(math.eq.0) go to 20
          lfind=(math.eq.matd).and.(mfh.eq.2).and.(mth.eq.153)
        enddo
        if(lfind) irflag=1
@@ -417,6 +421,7 @@ contains
      else if(npendf.gt.0) then
        read(npendf,'(6e11.0,i4,i2,i3,i5)',end=30) aa,math,mfh,mth,nsp
      endif
+     if(math.eq.0) go to 30
      lfind=(math.eq.matno).and.(mfh.eq.1).and.(mth.eq.451)
    enddo
    if(.not.lfind) go to 30
@@ -602,6 +607,7 @@ contains
      else if(npendf.gt.0) then
        read(npendf,'(6e11.0,i4,i2,i3,i5)',end=50) aa,math,mfh,mth,nsp
      endif
+     if(math.eq.0) go to 50
      lfind=(math.eq.matno).and.(mfh.eq.3).and.(mth.eq.18)
    enddo
    if(lfind) then
