@@ -1834,6 +1834,7 @@ contains
    ngther=0
    call repoz(nin)
    10 lfind=.false.
+   call skiprz(nin,1)
    do while (.not.lfind)
      if(nin.lt.0) then
        read(-nin,end=20) math,mfh,mth,nb,nw
@@ -2117,6 +2118,7 @@ contains
    cspc(:maxgr)=0.0
    call repoz(nin)
    10 lfind=.false.
+   call skiprz(nin,1)
    do while (.not.lfind)
      if(nin.lt.0) then
        read(-nin,end=900) math,mfh,mth,nb,nw
@@ -2231,6 +2233,7 @@ contains
    flux(:maxgr,:maxnl,:maxnz)=0.0
    call repoz(nin)
    10 lfind=.false.
+   call skiprz(nin,1)
    do while (.not.lfind)
      if(nin.lt.0) then
        read(-nin,end=900) math,mfh,mth,nb,nw
