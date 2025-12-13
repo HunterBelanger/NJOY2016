@@ -2223,7 +2223,7 @@ contains
    integer :: maxa,lz
    parameter (maxa=2000,lz=6)
    integer maxgr,maxnl,maxnz,nin,matd,mt,ng,nl,nz,ig,il,iz,jg,loc,locf,nb, &
-   & ng2, nw
+   & ng2,nw
    logical exist,lfind
    real(kr) ytemp,rv(maxgr,maxnl,maxnz),flux(maxgr,maxnl,maxnz),aa(6)
    real(kr),allocatable,dimension(:) :: scr

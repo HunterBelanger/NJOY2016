@@ -57,7 +57,7 @@ contains
    integer :: maxa,maxgr,maxnl,maxnz,maxnor,npar
    ! maxnor: maximum order of a CALENDF probability table
    ! npar: number of partial cross section types
-   parameter (maxa=2000,maxgr=2000,maxnl=8,maxnz=30,maxnor=12,npar=3)
+   parameter (maxa=2000,maxgr=2000,maxnl=8,maxnz=30,maxnor=12,npar=6)
    integer::matd,itemp,ntemp,irflag,iprint,ner,nw,ng,ng0,ipreci,mtin,ipar, &
    & nl,nz
    logical lurr,lfind,exist
@@ -65,7 +65,10 @@ contains
    real(kr) ener(maxgr+1)
    real(kr),dimension(:),allocatable :: scr,temp
    real(kr),dimension(:,:,:),allocatable :: proref,flux,rv
-   !
+   ! list of mt corresponding to partial (correlated) reactions
+   integer, save, dimension(npar) :: malist= &
+   & (/ 2,4,16,17,18,102 /) ! must be in increasing order
+!
    call timer(time)
    write(nsyso,'(/'' calenr...produce a gendf format output tape'',24x,f8.1, &
    & ''s'')') time
@@ -202,25 +205,21 @@ contains
      &  '' purr information flag ....................... '',i10)') irflag
      !
      ! recover infinite-dilution GENDF cross sections
-     allocate(proref(ng,npar+1,ntemp))
-     proref(:ng,:npar+1,:ntemp)=0.d0
+     allocate(proref(npar+1,ng,ntemp))
+     proref(:npar+1,:ng,:ntemp)=0.d0
      allocate(flux(maxgr,maxnl,maxnz),rv(maxgr,maxnl,maxnz))
      do itemp=1,ntemp
        do ipar=1,npar+1
          if(ipar.eq.1) then
            mtin=1 ! total
-         else if(ipar.eq.2) then
-           mtin=2 ! elastic scattering
-        else if(ipar.eq.3) then
-           mtin=18 ! fission
-         else if(ipar.eq.4) then
-           mtin=102 ! radiative capture
+         else
+           mtin=malist(max(1,ipar-1)) ! partial reaction
          endif
          call cfvect(maxgr,maxnl,maxnz,nin,matd,mtin,temp(itemp),ng0,nl,nz, &
          & rv,flux,exist)
          if(.not.exist) cycle
          if(ng0.ne.ng) call error('calenr','inconsistent ng',' ')
-         proref(:ng,ipar,itemp)=rv(:ng,1,1)
+         proref(ipar,:ng,itemp)=rv(:ng,1,1)
        enddo
      enddo
      deallocate(rv,flux)
@@ -229,7 +228,7 @@ contains
      call repoz(nin)
      call findf(matd,1,451,nin)
      call calpt(npendf,matd,ng,ener,eres0,eres1,irflag,urlimit,ntemp,temp, &
-     & maxnor,ipreci,npar,proref,iprint)
+     & maxnor,ipreci,npar,malist,proref,iprint)
      deallocate(proref)
    enddo ! material loop
    deallocate(temp)
@@ -280,7 +279,7 @@ contains
    end subroutine calhd
    !
    subroutine calurr(maxnor,nbinpt,nunr,nbdil,npar,lssf,ep,eneurr,scr2a, &
-   & scr2b,factor,momt,momp,ndil,dilut,sefr)
+   & scr2b,factor,momt,momp,ndil,dilut,proref,sefr)
    !-------------------------------------------------------------------
    ! Compute cross section moments in the unresolved resonance rang
    !-------------------------------------------------------------------
@@ -289,16 +288,19 @@ contains
    integer :: maxnor,nbinpt,nunr,nbdil,npar,lssf,ndil
    real(kr) :: ep,eneurr(nunr),scr2a(nbdil+(1+5*nbdil)*nunr), &
    & scr2b((1+6*nbinpt)*nunr),factor,momt(2*maxnor),momp(maxnor,npar), &
-   & dilut(ndil),sefr(npar+2,ndil)
+   & dilut(ndil),proref(npar+1),sefr(npar+2,ndil)
    ! internals
-   integer :: i,iunr,iof,inor,jnor,ityp,idil
+   integer :: i,iunr,iof,inor,jnor,idil,ipar,ityp
    real(kr) :: tt,sigt,sigx,bond
+   integer, save, dimension(6) :: matype= &
+   & (/ 1,0,0,0,2,3 /) ! purr/malist correspondance
    real(kr), allocatable, dimension(:) :: siginf,www
    real(kr), allocatable, dimension(:,:) :: sig
    character(len=131) hsmg
    !
    allocate(siginf(npar+1),www(nbinpt),sig(nbinpt,npar+1))
    iunr=0
+   if(ep.ge.eneurr(nunr)) go to 20 ! continuum
    do i=nunr,1,-1
      if(ep.ge.eneurr(i)) then
        iunr=i
@@ -308,14 +310,15 @@ contains
        go to 10
      endif
    enddo
-   write(hsmg,'(7henergy=,1p,e12.4,12h outside urr)') ep
    call error('calurr',hsmg,' ')
-   10 do ityp=1,npar+1
+   !
+   ! process URR
+   10 do ityp=1,4 ! assume 4 types of PURR basepoints
      siginf(ityp)=scr2a(nbdil+(iunr-1)*(1+5*nbdil)+(ityp-1)*nbdil+2)
    enddo
    iof=1+(iunr-1)*(1+6*nbinpt)
    www(:nbinpt)=scr2b(iof+1:iof+nbinpt)
-   do ityp=1,npar+1
+   do ityp=1,4
      iof=iof+nbinpt
      sig(:nbinpt,ityp)=scr2b(iof+1:iof+nbinpt)
    enddo
@@ -340,34 +343,85 @@ contains
        sefr(1,idil)=sefr(1,idil)+www(inor)*bond
        sefr(2,idil)=sefr(2,idil)+www(inor)*sigt*bond
      enddo
-     do ityp=2,npar+1
-       if(lssf.eq.1) then
-         sigx=sig(inor,ityp)*siginf(ityp)
+     do ipar=1,npar
+       ! sigx is the base point of a partial reaction
+       ityp=matype(ipar)
+       if(ityp.gt.0) then
+         if(lssf.eq.1) then
+           sigx=sig(inor,ityp+1)*siginf(ityp+1)
+         else
+           sigx=sig(inor,ityp+1)
+         endif
        else
-         sigx=sig(inor,ityp)
+         ! purr doesn't process malist(ipar); use an approximation in the URR
+         if(lssf.eq.1) then
+           sigx=sig(inor,1)*siginf(1)-sig(inor,2)*siginf(2)-sig(inor,3)* &
+           & siginf(3)-sig(inor,4)*siginf(4)
+         else
+           sigx=sig(inor,1)-sig(inor,2)-sig(inor,3)-sig(inor,4)
+         endif
+         ! 1: total; 2: elastic; 6: fission; 7: capture
+         sigx=sigx*proref(ipar+1)/(proref(1)-proref(2)-proref(6)-proref(7))
        endif
        tt=www(inor)*sigx
        do jnor=maxnor/2+1,maxnor
-         momp(jnor,ityp-1)=momp(jnor,ityp-1)+factor*tt
+         momp(jnor,ipar)=momp(jnor,ipar)+factor*tt
          tt=tt*sigt
        enddo ! inor
        tt=www(inor)*sigx/sigt
        do jnor=maxnor/2,1,-1
-         momp(jnor,ityp-1)=momp(jnor,ityp-1)+factor*tt
+         momp(jnor,ipar)=momp(jnor,ipar)+factor*tt
          tt=tt/sigt
        enddo ! jnor
        do idil=1,ndil
          bond=factor*dilut(idil)/(sigt+dilut(idil))
-         sefr(ityp+1,idil)=sefr(ityp+1,idil)+www(inor)*sigx*bond
+         sefr(ipar+2,idil)=sefr(ipar+2,idil)+www(inor)*sigx*bond
        enddo
-     enddo ! ityp
+     enddo ! ipar
    enddo ! inor
-   deallocate(sig,www,siginf)
+   go to 30
+   !
+   ! process continuum
+   20 sigt=proref(1) ! sigt is the total cross section
+   tt=1.0
+   do jnor=maxnor,2*maxnor
+     momt(jnor)=momt(jnor)+factor*tt
+     tt=tt*sigt
+   enddo
+   tt=1.0/sigt
+   do jnor=maxnor-1,1,-1
+     momt(jnor)=momt(jnor)+factor*tt
+     tt=tt/sigt
+   enddo
+   do idil=1,ndil
+     bond=factor*dilut(idil)/(sigt+dilut(idil))
+     sefr(1,idil)=bond
+     sefr(2,idil)=sigt*bond
+   enddo
+   do ipar=1,npar 
+     sigx=proref(ipar+1) ! sigx is the base point cross section
+     tt=sigx
+     do jnor=maxnor/2+1,maxnor
+       momp(jnor,ipar)=momp(jnor,ipar)+factor*tt
+       tt=tt*sigt
+     enddo ! inor
+     tt=sigx/sigt
+     do jnor=maxnor/2,1,-1
+       momp(jnor,ipar)=momp(jnor,ipar)+factor*tt
+       tt=tt/sigt
+     enddo ! jnor
+     do idil=1,ndil
+       bond=factor*dilut(idil)/(sigt+dilut(idil))
+       sefr(ipar+2,idil)=sigx*bond
+     enddo
+   enddo
+   ! deallocate scratch memory
+   30 deallocate(sig,www,siginf)
    return
    end subroutine calurr
    !
    subroutine calpt(npendf,matno,ng,ener,eres0,eres1,irflag,urlimit, &
-   & ntemp,temp,maxnor,ipreci,npar,proref,iprint)
+   & ntemp,temp,maxnor,ipreci,npar,malist,proref,iprint)
    !-----------------------------------------------------------------
    !  put CALENDF probability tables on GENDF tape for material matno
    !-----------------------------------------------------------------
@@ -375,24 +429,26 @@ contains
    use endf   ! provides endf routines and variables
    use util   ! provides openz,repoz,error
    ! externals
-   integer :: npendf,matno,ng,irflag,ntemp,maxnor,ipreci,npar,iprint
-   real(kr) ener(ng+1),eres0,eres1,urlimit,temp(ntemp),proref(ng,npar+1,ntemp)
+   integer :: npendf,matno,ng,irflag,ntemp,maxnor,ipreci,npar,malist(npar), &
+   & iprint
+   real(kr) ener(ng+1),eres0,eres1,urlimit,temp(ntemp),proref(npar+1,ng,ntemp)
    ! internals
    integer :: maxa,maxtmp,maxbin,ndil
    parameter (maxa=3000,maxtmp=10,maxbin=1000000,ndil=5)
-   integer i,j,ig,itm,irflag_2,lssf,nbdil,ndata,nunr,loc,nw,nbinpt,igres0, &
-   & igres1,idis,iener,inor,idil,ipar,ibase,lim,nl,nz
+   integer i,j,ig,itm,mt,irflag_2,lssf,nbdil,ndata,nunr,loc,nw,nbinpt,igres0, &
+   & igres1,idis,iener,nener,inor,idil,ipar,ibase,lim,nl,nz,icount
    character(len=131) :: hsmg
    real(kr) temps,aa(6),deltau,em,emlog,ep,eplog,enext,tm,tp,sm,sp,tt,sigt, &
    & sigx,errbst,factor,za,awr
-   logical lfind,lnoraj
+   logical lnoraj,lfind
    integer, allocatable, dimension(:) :: npanel,nor
    real(kr), allocatable, dimension(:) :: scr,scr1,scr2a,scr2b,eneurr
    real(kr), allocatable, dimension(:,:) :: momt,ekep
    real(kr), allocatable, dimension(:,:,:) :: momp,sefr,prosig
+   logical, allocatable, dimension(:) :: lfindv
    real(kr),dimension(ndil),parameter :: dilut = &
      & (/ 1.e10, 1.e5, 1.e4, 1.e3, 1.e2 /)
-   allocate(scr(maxa),nor(ng))
+   allocate(scr(maxa),nor(ng),lfindv(npar))
    nor(:ng)=0
    !
    ! ***compute igres0 and igres1
@@ -507,7 +563,7 @@ contains
      em=eres0
      call gety1(em,enext,idis,tm,npendf,scr1)
      allocate(ekep(2,maxbin)) ! allocate the big array containing sigt values
-     iener=1
+     nener=1
      ekep(1,1)=em ; ekep(2,1)=tm
      ig=1
      momt(:2*maxnor,:ng)=0.0d0
@@ -516,18 +572,18 @@ contains
      npanel(:ng)=0
      emlog=log(eres1/em)
      do while(ep*(1.0d0+1.0d-6).lt.eres1)
-       if(ig.gt.ng) call error('calpt','invalid index',' ')
+       if(ig.gt.ng) call error('calpt','invalid index(1)',' ')
        ep=min(enext,ener(ig+1))
        eplog=log(eres1/ep)
        call gety1(ep,enext,idis,tp,npendf,scr1)
        if((irflag_2.eq.0).or.(ep.le.urlimit)) then
          npanel(ig)=npanel(ig)+1
-         iener=iener+1
-         if(iener.gt.maxbin) then
+         nener=nener+1
+         if(nener.gt.maxbin) then
            write(hsmg,'(24hmaxbin overflow in group,i5)') ig
            call error('calpt',hsmg,' ')
          endif
-         ekep(1,iener)=ep ; ekep(2,iener)=tp
+         ekep(1,nener)=ep ; ekep(2,nener)=tp
          sigt=max(0.001,0.5d0*(tm+tp))
          tt=1.0d0
          do inor=maxnor,2*maxnor
@@ -548,153 +604,79 @@ contains
          npanel(ig)=-1
          factor=emlog-eplog
          call calurr(maxnor,nbinpt,nunr,nbdil,npar,lssf,ep,eneurr,scr2a, &
-         & scr2b,factor,momt(1,ig),momp(1,1,ig),ndil,dilut,sefr(1,1,ig))
+         & scr2b,factor,momt(1,ig),momp(1,1,ig),ndil,dilut,proref(1,ig,itm), &
+         & sefr(1,1,ig))
        endif
        if(ep.eq.ener(ig+1)) ig=ig+1
        em=ep ; tm=tp ; sm=sp
        emlog=eplog
      enddo
      !
-     !**recover the pointwise scattering cross sections.
-     call findf(matno,3,2,npendf)
-     call contio(npendf,0,0,scr1,nb,nw)
-     ep=0.0d0
-     call gety1(ep,enext,idis,tp,npendf,scr1)
-     em=eres0
-     call gety1(em,enext,idis,tm,npendf,scr1)
-     iener=1
-     sm=ekep(2,1)
-     ig=1
-     emlog=log(eres1/em)
-     do while(ep*(1.0d0+1.0d-6).lt.eres1)
-       if(ig.gt.ng) call error('calpt','invalid index',' ')
-       ep=min(enext,ener(ig+1))
-       eplog=log(eres1/ep)
-       call gety1(ep,enext,idis,tp,npendf,scr1)
-       if((irflag_2.eq.0).or.(ep.le.urlimit)) then
-         iener=iener+1
-         if(iener.gt.maxbin) call error('calpt','maxbin overflow(1)',' ')
-         if(ep.ne.ekep(1,iener)) call error('calpt','ekep error(1)',' ')
-         sp=ekep(2,iener)
-         sigt=max(0.001,0.5d0*(sm+sp))
-         sigx=0.5d0*(tm+tp)
-         tt=sigx
-         do inor=maxnor/2+1,maxnor
-           momp(inor,1,ig)=momp(inor,1,ig)+(emlog-eplog)*tt
-           tt=tt*sigt
-         enddo
-         tt=sigx/sigt
-         do inor=maxnor/2,1,-1
-           momp(inor,1,ig)=momp(inor,1,ig)+(emlog-eplog)*tt
-           tt=tt/sigt
-         enddo
-         do idil=1,ndil
-           factor=(emlog-eplog)*dilut(idil)/(sigt+dilut(idil))
-           sefr(3,idil,ig)=sefr(3,idil,ig)+factor*sigx
-         enddo
-       endif
-       if(ep.eq.ener(ig+1)) ig=ig+1
-       em=ep ; tm=tp ; sm=sp
-       emlog=eplog
-     enddo
-     !
-     !**recover the pointwise fission cross sections (if exists).
-     lfind=.false.
-     do while (.not.lfind)
-      if(npendf.lt.0) then
-         read(-npendf,end=50) math,mfh,mth,nb,nw
-       else if(npendf.gt.0) then
-         read(npendf,'(6e11.0,i4,i2,i3,i5)',end=50) aa,math,mfh,mth,nsp
-       endif
-       if(math.eq.0) go to 50
-       lfind=(math.eq.matno).and.(mfh.eq.3).and.(mth.eq.18)
-     enddo
-     if(lfind) then
-       call findf(matno,3,18,npendf)
-       call contio(npendf,0,0,scr1,nb,nw)
-       ep=0.0d0
-       call gety1(ep,enext,idis,tp,npendf,scr1)
-       em=eres0
-       call gety1(em,enext,idis,tm,npendf,scr1)
-       iener=1
-       sm=ekep(2,1)
-       ig=1
-       emlog=log(eres1/em)
-       do while(ep*(1.0d0+1.0d-6).lt.eres1)
-         if(ig.gt.ng) call error('calpt','invalid index',' ')
-         ep=min(enext,ener(ig+1))
-         eplog=log(eres1/ep)
-         call gety1(ep,enext,idis,tp,npendf,scr1)
-         if((irflag_2.eq.0).or.(ep.le.urlimit)) then
-           iener=iener+1
-           if(iener.gt.maxbin) call error('calpt','maxbin overflow(2)',' ')
-           if(ep.ne.ekep(1,iener)) call error('calpt','ekep error(2)',' ')
-           sp=ekep(2,iener)
-           sigt=max(0.001,0.5d0*(sm+sp))
-           sigx=0.5d0*(tm+tp)
-           tt=sigx
-           do inor=maxnor/2+1,maxnor
-             momp(inor,2,ig)=momp(inor,2,ig)+(emlog-eplog)*tt
-             tt=tt*sigt
-           enddo
-           tt=sigx/sigt
-           do inor=maxnor/2,1,-1
-             momp(inor,2,ig)=momp(inor,2,ig)+(emlog-eplog)*tt
-             tt=tt/sigt
-           enddo
-           do idil=1,ndil
-             factor=(emlog-eplog)*dilut(idil)/(sigt+dilut(idil))
-             sefr(4,idil,ig)=sefr(4,idil,ig)+factor*sigx
-           enddo
+     lfindv(:npar)=.false.
+     do ipar=1,npar
+       !**recover the pointwise cross sections fot malist(ipar) (if exists).
+       mt=malist(ipar)
+       icount=0
+       do while (.not.lfindv(ipar))
+         if(npendf.lt.0) then
+           read(-npendf,end=50) math,mfh,mth,nb,nw
+         else if(npendf.gt.0) then
+           read(npendf,'(6e11.0,i4,i2,i3,i5)',end=50) aa,math,mfh,mth,nsp
          endif
-         if(ep.eq.ener(ig+1)) ig=ig+1
-         em=ep ; tm=tp ; sm=sp
-         emlog=eplog
+         icount=icount+1
+         if(math.eq.0) then
+           call skiprz(npendf,-icount)
+           go to 50
+         endif
+         lfindv(ipar)=(math.eq.matno).and.(mfh.eq.3).and.(mth.eq.mt)
        enddo
-     endif
-     !
-     !**recover the pointwise capture cross sections.
-     50 call findf(matno,3,102,npendf)
-     call contio(npendf,0,0,scr1,nb,nw)
-     ep=0.0d0
-     call gety1(ep,enext,idis,tp,npendf,scr1)
-     em=eres0
-     call gety1(em,enext,idis,tm,npendf,scr1)
-     iener=1
-     sm=ekep(2,1)
-     ig=1
-     emlog=log(eres1/em)
-     do while(ep*(1.0d0+1.0d-6).lt.eres1)
-       if(ig.gt.ng) call error('calpt','invalid index',' ')
-       ep=min(enext,ener(ig+1))
-       eplog=log(eres1/ep)
-       call gety1(ep,enext,idis,tp,npendf,scr1)
-       if((irflag_2.eq.0).or.(ep.le.urlimit)) then
-         iener=iener+1
-         if(iener.gt.maxbin) call error('calpt','maxbin overflow(3)',' ')
-         if(ep.ne.ekep(1,iener)) call error('calpt','ekep error(3)',' ')
-         sp=ekep(2,iener)
-         sigt=max(0.001,0.5d0*(sm+sp))
-         sigx=0.5d0*(tm+tp)
-         tt=sigx
-         do inor=maxnor/2+1,maxnor
-           momp(inor,3,ig)=momp(inor,3,ig)+(emlog-eplog)*tt
-           tt=tt*sigt
-         enddo
-         tt=sigx/sigt
-         do inor=maxnor/2,1,-1
-           momp(inor,3,ig)=momp(inor,3,ig)+(emlog-eplog)*tt
-           tt=tt/sigt
-         enddo
-         do idil=1,ndil
-           factor=(emlog-eplog)*dilut(idil)/(sigt+dilut(idil))
-          sefr(5,idil,ig)=sefr(5,idil,ig)+factor*sigx
+       if(lfindv(ipar)) then
+         call findf(matno,3,mt,npendf)
+         call contio(npendf,0,0,scr1,nb,nw)
+         ep=0.0d0
+         call gety1(ep,enext,idis,tp,npendf,scr1)
+         em=eres0
+         call gety1(em,enext,idis,tm,npendf,scr1)
+         iener=1
+         sm=ekep(2,1)
+         ig=1
+         emlog=log(eres1/em)
+         do while(ep*(1.0d0+1.0d-6).lt.eres1)
+           if(ig.gt.ng) then
+             write(hsmg,'(21hinvalid index for mt=,i3)') mt
+             call error('calpt',hsmg,' ')
+           endif
+           if((irflag_2.eq.0).or.(ep.le.urlimit)) then
+             iener=iener+1
+             if(iener.gt.nener) exit
+             ep=ekep(1,iener)
+             eplog=log(eres1/ep)
+             call gety1(ep,enext,idis,tp,npendf,scr1)
+             sp=ekep(2,iener)
+             sigt=max(0.001,0.5d0*(sm+sp))
+             sigx=0.5d0*(tm+tp)
+             tt=sigx
+             do inor=maxnor/2+1,maxnor
+               momp(inor,ipar,ig)=momp(inor,ipar,ig)+(emlog-eplog)*tt
+               tt=tt*sigt
+             enddo
+             tt=sigx/sigt
+             do inor=maxnor/2,1,-1
+               momp(inor,ipar,ig)=momp(inor,ipar,ig)+(emlog-eplog)*tt
+               tt=tt/sigt
+             enddo
+             do idil=1,ndil
+               factor=(emlog-eplog)*dilut(idil)/(sigt+dilut(idil))
+               sefr(ipar+2,idil,ig)=sefr(ipar+2,idil,ig)+factor*sigx
+             enddo
+           endif
+           if(ep.eq.ener(ig+1)) ig=ig+1
+           em=ep ; tm=tp ; sm=sp
+           emlog=eplog
          enddo
        endif
-       if(ep.eq.ener(ig+1)) ig=ig+1
-       em=ep ; tm=tp ; sm=sp
-       emlog=eplog
-     enddo
+       50 cycle
+     enddo ! ipar
      deallocate(ekep) ! deallocate the big array containing sigt values
      if(irflag_2.eq.1) deallocate(scr2b,scr2a,eneurr)
      !
@@ -734,18 +716,15 @@ contains
      !
      ! normalize probability tables with respect to unit nin information
      do ipar=2,npar+2
+       if(ipar.eq.2) then
+         mth=1 ! total
+       else
+         mth=malist(max(1,ipar-2)) ! partial reaction
+         if(.not.lfindv(max(1,ipar-2))) cycle
+       endif
        if(iprint.gt.0) then
-         if(ipar.eq.2) then
-           mth=501 ! total
-         else if(ipar.eq.3) then
-           mth=502 ! elastic scattering
-         else if(ipar.eq.4) then
-           mth=518 ! fission
-         else if(ipar.eq.5) then
-           mth=602 ! radiative capture
-         endif
          write(nsyso,'(/48h calpt: normalization of probability tables for , &
-         & 3hmt=,i4/13x,5hgendf,5x,7hcalendf,6x,6hfactor)') mth
+         & 3hmt=,i4/13x,5hgendf,5x,7hcalendf,6x,6hfactor,3x,5horder)') mth
        endif
        do ig=igres0,igres1
          sigt=0.d0
@@ -753,30 +732,28 @@ contains
            sigt=sigt+prosig(inor,1,ig)*prosig(inor,ipar,ig)
          enddo
          if(sigt.ne.0.d0) then
-           factor=proref(ig,ipar-1,itm)/sigt
+           factor=proref(ipar-1,ig,itm)/sigt
          else
            factor=1.d0
          endif
          prosig(:nor(ig),ipar,ig)=prosig(:nor(ig),ipar,ig)*factor
-         if(iprint.gt.0) write(nsyso,'(1x,i5,1p,3e12.4)') &
-         & ig,proref(ig,ipar-1,itm),sigt,factor
+         if((iprint.gt.0).and.(proref(ipar-1,ig,itm).ne.0.0)) then
+           write(nsyso,'(1x,i5,1p,3e12.4,i8,e12.4)') ig,proref(ipar-1,ig,itm),sigt, &
+           & factor,nor(ig)
+         endif
        enddo
      enddo
      !
      ! store probability tables on unit nout
      if(nout.ne.0) then
-       mfh=3 ; nz=1 ; nl=1
+       mfh=50 ; nz=1 ; nl=1
        do ipar=1,npar+2
          if(ipar.eq.1) then
-           mth=500 ! weights
+           mth=100 ! weights
          else if(ipar.eq.2) then
-           mth=501 ! total
-         else if(ipar.eq.3) then
-           mth=502 ! elastic scattering
-         else if(ipar.eq.4) then
-           mth=518 ! fission
-         else if(ipar.eq.5) then
-           mth=602 ! radiative capture
+           mth=1 ! total
+         else
+           mth=malist(max(1,ipar-2))
          endif
          scr(1)=za
          scr(2)=awr
@@ -786,6 +763,9 @@ contains
          scr(6)=igres1
          call contio(0,nout,0,scr,nb,nw)
          do ig=igres0,igres1
+           if(ipar.gt.2) then
+             if(proref(max(1,ipar-1),ig,itm).eq.0.0) cycle
+           endif
            nw=6
            lim=nl*nz*nor(ig)
            scr(1)=temps
@@ -819,7 +799,7 @@ contains
      call tomend(npendf,0,0,scr)
      deallocate(scr1)
    enddo ! itm
-   100 deallocate(nor,scr)
+   100 deallocate(lfindv,nor,scr)
    return
    end subroutine calpt
    !
