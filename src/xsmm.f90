@@ -47,6 +47,8 @@ module xsmm
    !  entry xsmnxt : find the name of the next block stored in the active
    !                 directory. if namp=' ' at input, find any name for
    !                 any block stored in this directory.
+   !  entry xsmequ : deep copy of the xsm file.
+   !  entry xsmexp : (de)serialization of the xsm file.
    !  entry xsmcl  : close the xsm file.
    !
    ! type(xsm_file):
@@ -75,7 +77,8 @@ module xsmm
    use filem
    implicit none
    private
-   public :: xsm_file,xsmop,xsmget,xsmput,xsmcl,xsmsix,xsmlib,xsmexp,xsmlen
+   public :: xsm_file,xsmop,xsmget,xsmput,xsmcl,xsmsix,xsmlib,xsmequ,xsmexp, &
+   & xsmlen
    integer,parameter :: iofmax=30,iprim=3,iwrd=3,klong=5+iwrd+(3+iwrd)*iofmax
    ! iprim=address of the root directory.
    ! klong=length of a directory extent in memory.
@@ -136,15 +139,15 @@ contains
    !           contains one or many xsm_file objects.
    !    mode : type of access.  =0: new file mode;
    !                            =1: modification mode;
-   !                            =2: read only mode (default value).
-   !    impx : if impx=0, we suppress printing on xsmop (optional).
+   !                            =2: read only mode.
+   !    impx : if impx=0, we suppress printing on xsmop.
    !
    ! output parameter:
    !  pfxsm : xsm_file object handle.
    !
    !-----------------------------------------------------------------------
    use util   ! provides error
-   use mainio ! provides nsysi,contio,nsyso,nsyse
+   use mainio ! provides nsyso
    !
    type(xsm_file),pointer :: pfxsm
    character(len=*) :: fname
@@ -635,7 +638,7 @@ contains
    !
    !----------------------------------------------------------------------
    use util   ! provides error
-   use mainio ! provides nsysi,contio,nsyso,nsyse
+   use mainio ! provides nsyso
    type(xsm_file),pointer :: pfxsm
    character(len=*) :: namp
    integer :: iact
@@ -1034,10 +1037,11 @@ contains
    ! list the content of every extents that belong to the active directory.
    !
    !-----------------------------------------------------------------------
-   use mainio ! provides nsysi,contio,nsyso,nsyse
+   use mainio ! provides nsyso
    type(xsm_file),pointer :: pfxsm
    integer, parameter :: ntype=8
    integer :: inmt,ilong,ityxsm,itot,ity
+   character(len=4) labell(18)
    character namt*12,myname*12,first*12,ctype(ntype)*16
    save ctype
    data (ctype(ity),ity=1,ntype)/'directory','integer','real', &
@@ -1059,29 +1063,108 @@ contains
    if(ityxsm.eq.0) then
       write (nsyso,110) inmt,namt,ctype(1)
    else
-      write (nsyso,120) inmt,namt,ilong,ctype(ityxsm+1)
+      if((ilong.eq.3).and.(ityxsm.eq.3)) then
+        call xsmget(pfxsm,namt,labell)
+        write (nsyso,120) inmt,namt,ilong,ctype(ityxsm+1),labell(:3)
+      else
+        write (nsyso,130) inmt,namt,ilong,ctype(ityxsm+1)
+      endif
       itot=itot+ilong
    endif
    call xsmnxt(pfxsm,namt,myname)
    if(namt.eq.first) go to 20
    go to 10
    !
-   20 write(nsyso,130) myname,itot
+   20 write(nsyso,140) myname,itot
    return
    !
    90 format (/10h xsmlib: ',a12,24h' is an empty directory.)
    100 format (//38h xsmlib: content of active directory ',a12,2h':// &
    & 11h block name,10(1h-),4x,6hlength,4x,4htype/)
    110 format (1x,i4,3h  ',a12,1h',14x,a16)
-   120 format (1x,i4,3h  ',a12,1h',i10,4x,a16)
-   130 format (//37h total number of words on directory ',a12,3h' =,i10/)
+   120 format (1x,i4,3h  ',a12,1h',i10,4x,a16,2h=',3a4,1h')
+   130 format (1x,i4,3h  ',a12,1h',i10,4x,a16)
+   140 format (//37h total number of words on directory ',a12,3h' =,i10/)
    end subroutine xsmlib
+   !
+   subroutine xsmequ(pfxsm1,pfxsm2)
+   !-----------------------------------------------------------------------
+   !
+   ! perform a deep-copy of the information contained in an xsm file (address
+   ! pfxsm1) towards another xsm file (address pfxsm2). Note that the second
+   ! xsm file (address pfxsm2) is modified but not created by xsmequ.
+   !
+   ! pfxsm1  : address of the existing xsm file (accessed in read-only mode).
+   ! pfxsm2  : address of the xsm file, modified by xsmequ.
+   !
+   !-----------------------------------------------------------------------
+   use util   ! provides error
+   integer,parameter :: nlevel=50
+   type(xsm_file),pointer :: pfxsm1,pfxsm2
+   character(len=12) :: namt,myname,first(nlevel)
+   integer :: ilevel,ilong,ityxsm
+   integer,allocatable,dimension(:) :: ibase
+   real,allocatable,dimension(:) :: rbase
+   character(len=4),allocatable,dimension(:) :: hbase
+   double precision,allocatable,dimension(:) :: dbase
+   !
+   ilevel=1
+   10 namt=' '
+   call xsmnxt(pfxsm1,namt,myname)
+   !
+   first(ilevel)=namt
+   20 call xsmlen(pfxsm1,namt,ilong,ityxsm)
+   if(ityxsm==0) then
+      ! directory data.
+      ilevel=ilevel+1
+      if(ilevel.gt.nlevel) call error('xsmequ','too many directory levels.',' ')
+      call xsmsix(pfxsm1,namt,1)
+      call xsmsix(pfxsm2,namt,1)
+      go to 10
+   else if((ilong/=0).and.(ityxsm<=6)) then
+      if(ityxsm==1) then
+         ! integer data.
+         allocate(ibase(ilong))
+         call xsmget(pfxsm1,namt,ibase)
+         call xsmput(pfxsm2,namt,ibase)
+         deallocate(ibase)
+      else if(ityxsm==2) then
+         ! single precision data.
+         allocate(rbase(ilong))
+         call xsmget(pfxsm1,namt,rbase)
+         call xsmput(pfxsm2,namt,rbase)
+         deallocate(rbase)
+      else if(ityxsm==3) then
+         ! character*4 data.
+         allocate(hbase(ilong))
+         call xsmget(pfxsm1,namt,hbase)
+         call xsmput(pfxsm2,namt,hbase)
+         deallocate(hbase)
+      else if(ityxsm==4) then
+         ! double precision data.
+         allocate(dbase(ilong))
+         call xsmget(pfxsm1,namt,dbase)
+         call xsmput(pfxsm2,namt,dbase)
+         deallocate(dbase)
+      endif
+   endif
+   30 call xsmnxt(pfxsm1,namt,myname)
+   if(namt.eq.first(ilevel)) then
+      if(ilevel==1) return
+      namt=myname
+      ilevel=ilevel-1
+      call xsmsix(pfxsm1,' ',2)
+      call xsmsix(pfxsm2,' ',2)
+      go to 30
+   endif
+   go to 20
+   end subroutine xsmequ
    !
    subroutine xsmexp(pfxsm,nunit,imode,idir,impx)
    !-----------------------------------------------------------------------
    !
    ! export/import  the content of the xsm file using the contour method.
-   ! export start from the active directory. esope version.
+   ! export start from the active directory.
    !
    !  nunit  : unit number of the file where the export is performed.
    !  imode  : type of export/import file:
@@ -1090,7 +1173,7 @@ contains
    !  impx   : equal to zero for no print.
    !
    !-----------------------------------------------------------------------
-   use mainio ! provides nsysi,contio,nsyso,nsyse
+   use mainio ! provides nsyso
    use util   ! provides error
    type(xsm_file),pointer :: pfxsm
    integer :: nunit,imode,idir,impx
@@ -1103,7 +1186,7 @@ contains
    double precision,allocatable,dimension(:) :: dbase
    !
    if((imode.lt.1).or.(imode.gt.2)) then
-   write(hsmg,'(44hxsmexp: invalid file type on the xsm file lo, &
+      write(hsmg,'(44hxsmexp: invalid file type on the xsm file lo, &
       & 13hcated on unit,i3,1h.)') nunit
       call error('xsmexp',hsmg,' ')
    else if((idir.lt.1).or.(idir.gt.2)) then

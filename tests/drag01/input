@@ -153,7 +153,7 @@ groupr
  0/
  0/
 dragr
- -21 0 -26 0 0 30 29 1/
+ -21 0 -26 0 0 29 30 1/
  3640 Kr83 0 /
  'Kr83 from /tmp/endfb8r0 (3640) at Thu Mar 26 16:24:19 2020' /
  0.1 1.0E10 /
@@ -201,7 +201,7 @@ groupr
  0/
  0/
 dragr
- -21 0 -26 0 0 29 30 1/
+ -21 0 -26 0 0 30 29 1/
  5046 Sn119 0 /
  'Sn119 from /tmp/endfb8r0 (5046) at Thu Mar 26 16:27:39 2020' /
  0.1 1.0E10 /
@@ -213,7 +213,7 @@ dragr
 -- output file and inserted in another dragr call.
 --
 dragr
- 0 0 0 50 51 30 29/
+ 0 0 0 50 51 29 30/
  H1_H2O   ng  0.000 /                                                 
  Kr83     n2n  0.000 n3n  0.000 nnp  0.000 ng  0.000 np  0.000 nd  0.000         
           nt  0.000 nhe3  0.000 na  0.000 /     

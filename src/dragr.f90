@@ -5,6 +5,7 @@ module dragm
    implicit none
    private
    type(xsm_file),pointer :: draglib
+   character(len=8) :: fname
    public dragr
 
    ! random number generator for unresolved energy domain
@@ -36,10 +37,7 @@ contains
    ! Copyright:
    !  Copyright (C) 2003 Ecole Polytechnique de Montreal
    !  This library is free software; you can redistribute it and/or
-   !  modify it under the terms of the GNU Lesser General Public
-   !  License as published by the Free Software Foundation; either
-   !  version 2.1 of the License, or (at your option) any later
-   !  version.
+   !  modify it under the terms of the BSD license.
    !
    !---input specifications (free format)----
    !
@@ -49,8 +47,13 @@ contains
    !   ngendf    input gendf unit
    !   nfp       input endf unit for fission yield data
    !   ndcy      input endf unit for radioactive decay data
-   !   nimpo     input draglib unit
-   !   nexpo     output draglib unit
+   !   nimpo     input draglib unit. A negative value corresponds to
+   !             a binary direct access file named drag**. Set to zero
+   !             if the file is to be created.
+   !   nexpo     output draglib unit. A negative value corresponds to
+   !             a binary direct access file named drag**. Set to nimpo
+   !             to modify its contents in place (both nimpo and nexpo
+   !             must be negative in this case).
    !   pfflag    scattering storage flag: = 0/1/2. pfflag=1 to avoid
    !             storing scattering matrices; pfflag=2 to avoid
    !             storing scattering matrices above thermal energies
@@ -59,8 +62,7 @@ contains
    !             purr information is available. (default=0)
    !   idecay    fission product decay heat option (0 include, 1 don't)
    !   iprint    long print option (0/1=minimum/maximum) (default=0)
-   ! card 2 hollerith identification for the library
-   ! (nimpo=0 only)
+   ! card 2 hollerith identification for the library (nimpo=0 only)
    !   labell    72 character identification for the library
    ! card 3 material data (one card per material)
    !   matno     integer material identifier (endf/b mat number)
@@ -115,13 +117,6 @@ contains
    !            repeat card 9 for all isotopes present in the
    !            burnup chain. hich='end'/ terminates the chain.
    !
-   ! card 10 concatenate information
-   !   hmat      hollerith material identifier (up to 8 characters
-   !             each). By default, an ascii identifier is
-   !             constructed. It corresponds to the unique isotope
-   !             draglib previously computed that need to be concatenate.
-   !   inew      flag to specify if the isotope is the first one or
-   !             if a concatenated draglib exist.
    !-----------------------------------------------------------------
    use mainio ! provides nsysi,contio,nsyso,nsyse
    use endf   ! provides endf routines and variables
@@ -129,7 +124,8 @@ contains
    real(kr)::time,ether,eres0,eres1,eaut0,eaut1,deli,urlimit
    integer :: maxa,maxgr,maxesp
    parameter (maxa=2000,maxgr=2000,maxesp=4)
-   character text72*72,text12*12,text8*8
+   type(xsm_file),pointer :: draglib_in
+   character text72*72,text6*6,text8*8,text12*12
    integer ngen,matno,ng
    integer iesp(maxesp+1)
    character(len=4) labell(18)
@@ -137,7 +133,7 @@ contains
    integer i,ig,igaut0,igaut1,igrest,igres0,igres1,igecco,iig,ipflag,iza, &
    & nb,nbesp,ndcy,nendf,nexpo,nfp,nimpo,npen,nw,ilong,ilong1,ityxsm,inew, &
    & irflag,idecay,iprint,ner,igar(1),impy
-   logical lsame,lurr,lkerma
+   logical lsame,lurr,lkerma,lexist,lres
    real(kr) ener(maxgr+1),eesp(maxesp+1),delecco,delig,eh
    real eespi(maxesp+1),gar(1)
    real,allocatable,dimension(:) :: gar1,gar2
@@ -148,7 +144,7 @@ contains
    & ''s'')') time
    write(nsyse,'(/'' dragr...'',60x,f8.1,''s'')') time
    !
-   !**allocate xsm file containing the draglib
+   !**allocate xsm file containing the output draglib
    allocate(draglib)
    !
    !**read users input/output unit numbers.
@@ -189,9 +185,20 @@ contains
      call openz(nfp,0)
      call openz(ndcy,0)
    endif
-   if(nimpo.eq.0) then
-     ! ***create a new xsm file and write the signature
-     call xsmop(draglib,'drag',0,1)
+   !
+   !**recover the input draglib on unit nimpo and copy it on unit nexpo
+   lexist=.false.
+   if(nexpo.eq.0) then
+     call error('dragr','output draglib unit cannot be zero',' ')
+   else if(nimpo.eq.0) then
+     !**open a new xsm file and create the signature
+     write(text6,'(4hdrag,i2.2)') abs(nexpo)
+     inquire(file=text6,exist=lres)
+     if(lres) then
+       write(hsmg,'(13hdraglib file ,a6,15h already exists)') text6
+       call error('dragr',hsmg,' ')
+     endif
+     call xsmop(draglib,text6,0,1)
      text12='L_DRAGLIB'
      read(text12,'(3a4)') (labell(i),i=1,3)
      labell(1)=text12(1:4)
@@ -203,20 +210,87 @@ contains
      labell(2)=text12(5:8)
      labell(3)=text12(9:12)
      call xsmput(draglib,'VERSION',labell(1:3))
-   else
-     ! ***import the existing xsm file
-     call openz(nimpo,0)
-     call xsmop(draglib,'drag',0,1)
-     if(nimpo.gt.0) then
-       call xsmexp(draglib,nimpo,2,2,impy)
-     else
-       call xsmexp(draglib,-nimpo,1,2,impy)
+   else if((nimpo.lt.0).and.(nexpo.eq.nimpo)) then
+     !**open an existing direct access draglib in modification mode
+     write(text6,'(4hdrag,i2.2)') -nimpo
+     call xsmop(draglib,text6,1,1)
+     call xsmlen(draglib,'ENERGY',ilong1,ityxsm)
+     if(ilong1.eq.0) then
+       call xsmlib(draglib)
+       call error('dragr','no ENERGY record on existing draglib(1)',' ')
      endif
-     call closz(nimpo)
+     allocate(gar1(ilong1))
+     call xsmget(draglib,'ENERGY',gar1)
+     lexist=.true.
+   else if((nimpo.lt.0).and.(nexpo.lt.0).and.(nexpo.ne.nimpo)) then
+     !**open an existing direct access draglib in read-only mode
+     write(text6,'(4hdrag,i2.2)') -nimpo
+     allocate(draglib_in)
+     call xsmop(draglib_in,text6,2,1)
+     call xsmlen(draglib_in,'ENERGY',ilong1,ityxsm)
+     if(ilong1.eq.0) then
+       call xsmlib(draglib_in)
+       call error('dragr','no ENERGY record on existing draglib(2)',' ')
+     endif
+     allocate(gar1(ilong1))
+     call xsmget(draglib_in,'ENERGY',gar1)
+     !
+     write(text6,'(4hdrag,i2.2)') -nexpo
+     inquire(file=text6,exist=lres)
+     if(lres) then
+       call xsmop(draglib,text6,1,1) ! open draglib in modification mode
+     else
+       call xsmop(draglib,text6,0,1) ! open draglib in creation mode
+     endif
+     call xsmequ(draglib_in,draglib)
+     call xsmcl(draglib_in,1)
+     deallocate(draglib_in)
+     lexist=.true.
+   else
+     !**open and import an existing draglib
+     if(nexpo.lt.0) then
+       write(text6,'(4hdrag,i2.2)') -nexpo
+       inquire(file=text6,exist=lres)
+       if(lres) then
+         call xsmop(draglib,text6,1,1) ! open draglib in modification mode
+       else
+         call xsmop(draglib,text6,0,1) ! open draglib in creation mode
+       endif
+       call openz(nimpo,0)
+       call xsmexp(draglib,nimpo,2,2,impy)
+       call closz(nimpo)
+     else if(nexpo.gt.0) then
+       if(nimpo.lt.0) then
+         write(text6,'(4hdrag,i2.2)') -nimpo
+         call xsmop(draglib,text6,1,1)
+       else
+         write(text6,'(4hdrag,i2.2)') nexpo
+         call xsmop(draglib,text6,0,1)
+         call openz(nimpo,0)
+         call xsmexp(draglib,nimpo,2,2,impy)
+         call closz(nimpo)
+       endif
+       write(text6,'(4htape,i2.2)') nexpo
+       inquire(file=text6,exist=lres)
+       if(lres) then
+         !** concatenate nimpo to existing nexpo
+         call openz(nexpo,0)
+         call xsmexp(draglib,nexpo,2,2,impy)
+         call closz(nexpo)
+       endif
+     endif
+     call xsmlen(draglib,'ENERGY',ilong1,ityxsm)
+     if(ilong1.eq.0) then
+       call xsmlib(draglib)
+       call error('dragr','no ENERGY record on existing draglib(3)',' ')
+     endif
+     allocate(gar1(ilong1))
+     call xsmget(draglib,'ENERGY',gar1)
+     lexist=.true.
    endif
+   !**skip draglib feeding in trivial case
    if((nendf.eq.0).and.(npen.eq.0).and.(ngen.eq.0).and. &
-     &(nfp.eq.0).and.(ndcy.eq.0)) go to 40
-   call openz(nexpo,1)
+     &(nfp.eq.0).and.(ndcy.eq.0)) go to 30
    !
    !**read identification for the library
    if(nimpo.eq.0) then
@@ -262,7 +336,7 @@ contains
        call contio(nendf,0,0,scr,nb,nw)
        ner=n1h
        lurr=.false.
-       eh=-1.0E10
+       eh=-1.0e10
        do
          if((c1h.eq.0.0).and.(c2h.eq.0.0).and.(n1h.eq.0).and.(n2h.eq.0)) exit
          call contio(nendf,0,0,scr,nb,nw)
@@ -435,83 +509,52 @@ contains
    !
    ! **compute depletion-related data
    20 if((nfp.ne.0).and.(ndcy.ne.0)) then
-   call xsmsix(draglib,'DEPL-CHAIN',1)
-   call dradep(nfp,ndcy,idecay,iprint)
-   call xsmsix(draglib,' ',2)
-   call closz(ndcy)
-   call closz(nfp)
+     call xsmsix(draglib,'DEPL-CHAIN',1)
+     call dradep(nfp,ndcy,idecay,iprint)
+     call xsmsix(draglib,' ',2)
+     call closz(ndcy)
+     call closz(nfp)
    endif
    !
-   ! **concatenate two Draglib
-   40 if((nendf.eq.0).and.(npen.eq.0).and.(ngen.eq.0).and. &
-     &(nfp.eq.0).and.(ndcy.eq.0)) then
-     read(nsysi,*) text8,inew
-     call openz(nexpo,inew)
-     ! ***import the existing xsm file to concatenate
-     if(inew.eq.0) then
-       call xsmlen(draglib,'ENERGY',ilong,ityxsm)
-       if(ilong.eq.0) then
-         call xsmlib(draglib)
-         call error('dragr','no ENERGY record on existing draglib(1)',' ')
-       endif
-       allocate(gar1(ilong))
-       call xsmget(draglib,'ENERGY',gar1)
+   ! **check the energy mesh consistency
+   30 if(lexist) then
+     call xsmlen(draglib,'ENERGY',ilong,ityxsm)
+     if(ilong.eq.0) then
+       call xsmlib(draglib)
+       call error('dragr','no ENERGY record on new draglib',' ')
      endif
-     call xsmcl(draglib,2)
-     deallocate(draglib)
-     allocate(draglib)
-     call xsmop(draglib,'drag',0,1)
-     if(nexpo.gt.0) then
-       call xsmexp(draglib,nexpo,2,2,impy)
-     else
-       call xsmexp(draglib,-nexpo,1,2,impy)
-     endif
-     call closz(nexpo)
-     call openz(nexpo,1)
-     if(inew.eq.0) then
-       call xsmlen(draglib,'ENERGY',ilong1,ityxsm)
-       if(ilong1.eq.0) then
-         call xsmlib(draglib)
-         call error('dragr','no ENERGY record on existing draglib(2)',' ')
-       endif
-       allocate(gar2(ilong1))
-       call xsmget(draglib,'ENERGY',gar2)
-       if(ilong.ne.ilong1)  call error('dragr','number of energy' &
-       & //' group do not match for concatenate',' ')
-       lsame=.true.
+     allocate(gar2(ilong))
+     call xsmget(draglib,'ENERGY',gar2)
+     if(ilong.ne.ilong1)  call error('dragr','number of energy' &
+     & //' group do not match for concatenate',' ')
+     lsame=.true.
+     do ig=1,ilong-1
+       lsame=lsame.and.(abs(gar1(ig)-gar2(ig)).le.1.0e-3*gar1(ig))
+     enddo
+     if(.not.lsame) then
        do ig=1,ilong-1
-         lsame=lsame.and.(abs(gar1(ig)-gar2(ig)).le.1.0e-3*gar1(ig))
+         write(nsyso,*) ig,gar1(ig),gar2(ig), &
+         & abs(gar1(ig)-gar2(ig))/gar1(ig)*100,'%'
        enddo
-       if(.not.lsame) then
-         do ig=1,ilong-1
-           write(nsyso,*) ig,gar1(ig),gar2(ig), &
-           & abs(gar1(ig)-gar2(ig))/gar1(ig)*100, '%'
-         enddo
-         call error('dragr','inconsistent energy mesh',' ')
-       endif
-       deallocate(gar1,gar2)
+       call error('dragr','inconsistent energy mesh',' ')
      endif
-     call openz(nimpo,0)
-     if(nimpo.gt.0) then
-       call xsmexp(draglib,nimpo,2,2,impy)
-     else
-       call xsmexp(draglib,-nimpo,1,2,impy)
-     endif
-     call closz(nimpo)
+     deallocate(gar1,gar2)
    endif
-   if(iprint.gt.0) call xsmlib(draglib)
-   call xsmcl(draglib,1)
    !
-   ! **export the xsm file
-   call xsmop(draglib,'drag',2,1)
-   if(nexpo.gt.0) then
+   !** export/close the output draglib
+   if(nexpo.lt.0) then
+     call xsmcl(draglib,1) ! keep the file
+   else if(nexpo.gt.0) then
+     ! **open and export the new ascii draglib
+     call openz(nexpo,1)
      call xsmexp(draglib,nexpo,2,1,impy)
-   else
-     call xsmexp(draglib,-nexpo,1,1,impy)
+     call closz(nexpo)
+     if(nimpo.lt.0) then
+       call xsmcl(draglib,1) ! close the direct access file
+     else
+       call xsmcl(draglib,2) ! erase the direct access file
+     endif
    endif
-   call xsmcl(draglib,2)
-   !
-   !**deallocate xsm file containing the draglib
    deallocate(draglib)
    !
    call closz(nexpo)
@@ -2223,7 +2266,7 @@ contains
    integer :: maxa,lz
    parameter (maxa=2000,lz=6)
    integer maxgr,maxnl,maxnz,nin,matd,mt,ng,nl,nz,ig,il,iz,jg,loc,locf,nb, &
-   & ng2,nw
+   & ng2, nw
    logical exist,lfind
    real(kr) ytemp,rv(maxgr,maxnl,maxnz),flux(maxgr,maxnl,maxnz),aa(6)
    real(kr),allocatable,dimension(:) :: scr

@@ -20,10 +20,7 @@ contains
    ! Copyright:
    !  Copyright (C) 2025 Polytechnique Montreal
    !  This library is free software; you can redistribute it and/or
-   !  modify it under the terms of the GNU Lesser General Public
-   !  License as published by the Free Software Foundation; either
-   !  version 2.1 of the License, or (at your option) any later
-   !  version.
+   !  modify it under the terms of the BSD license.
    !
    !---input specifications (free format)----
    !
@@ -398,7 +395,7 @@ contains
      sefr(1,idil)=bond
      sefr(2,idil)=sigt*bond
    enddo
-   do ipar=1,npar 
+   do ipar=1,npar
      sigx=proref(ipar+1) ! sigx is the base point cross section
      tt=sigx
      do jnor=maxnor/2+1,maxnor
@@ -436,7 +433,7 @@ contains
    integer :: maxa,maxtmp,maxbin,ndil
    parameter (maxa=3000,maxtmp=10,maxbin=1000000,ndil=5)
    integer i,j,ig,itm,mt,irflag_2,lssf,nbdil,ndata,nunr,loc,nw,nbinpt,igres0, &
-   & igres1,idis,iener,nener,inor,idil,ipar,ibase,lim,nl,nz,icount
+   & igres1,idis,iener,nener,inor,idil,ipar,ibase,lim,nl,nz,icount,igmax
    character(len=131) :: hsmg
    real(kr) temps,aa(6),deltau,em,emlog,ep,eplog,enext,tm,tp,sm,sp,tt,sigt, &
    & sigx,errbst,factor,za,awr
@@ -457,7 +454,7 @@ contains
    do ig=ng+1,2,-1
      if(eres1.le.0.999d0*ener(ig+1)) igres1=ig-1
    enddo
-  do ig=1,ng
+   do ig=1,ng
      if(eres0.ge.1.001d0*ener(ig)) igres0=ig+1
    enddo
    write(nsyso,'(/ &
@@ -722,7 +719,11 @@ contains
          mth=malist(max(1,ipar-2)) ! partial reaction
          if(.not.lfindv(max(1,ipar-2))) cycle
        endif
-       if(iprint.gt.0) then
+       do ig=igres0,igres1
+         if(proref(ipar-1,ig,itm).ne.0.0) go to 60
+       enddo
+       cycle
+       60 if(iprint.gt.0) then
          write(nsyso,'(/48h calpt: normalization of probability tables for , &
          & 3hmt=,i4/13x,5hgendf,5x,7hcalendf,6x,6hfactor,3x,5horder)') mth
        endif
@@ -738,47 +739,57 @@ contains
          endif
          prosig(:nor(ig),ipar,ig)=prosig(:nor(ig),ipar,ig)*factor
          if((iprint.gt.0).and.(proref(ipar-1,ig,itm).ne.0.0)) then
-           write(nsyso,'(1x,i5,1p,3e12.4,i8,e12.4)') ig,proref(ipar-1,ig,itm),sigt, &
-           & factor,nor(ig)
+           write(nsyso,'(1x,i5,1p,3e12.4,i8,e12.4)') ig,proref(ipar-1,ig,itm), &
+           & sigt,factor,nor(ig)
          endif
        enddo
      enddo
      !
      ! store probability tables on unit nout
      if(nout.ne.0) then
+       call tomend(nin,nout,0,scr)
+       call skiprz(nout,-1)
        mfh=50 ; nz=1 ; nl=1
-       do ipar=1,npar+2
-         if(ipar.eq.1) then
-           mth=100 ! weights
-         else if(ipar.eq.2) then
+       do ipar=2,npar+2
+         if(ipar.eq.2) then
            mth=1 ! total
          else
            mth=malist(max(1,ipar-2))
          endif
+         igmax=0
+         do ig=igres0,igres1
+           if(proref(max(1,ipar-1),ig,itm).ne.0.0) igmax=ig
+         enddo
+         if(igmax.eq.0) cycle
+         igmax=igres1 ! to make ecco happy
          scr(1)=za
          scr(2)=awr
          scr(3)=1
          scr(4)=1
          scr(5)=0
-         scr(6)=igres1
+         scr(6)=igmax
          call contio(0,nout,0,scr,nb,nw)
-         do ig=igres0,igres1
+         do ig=igres0,igmax
            if(ipar.gt.2) then
              if(proref(max(1,ipar-1),ig,itm).eq.0.0) cycle
            endif
            nw=6
-           lim=nl*nz*nor(ig)
+           lim=2*nl*nz*nor(ig)
            scr(1)=temps
            scr(2)=0
-           scr(3)=nor(ig)
-           scr(4)=1
+           scr(3)=2
+           scr(4)=nor(ig)
            scr(5)=lim
            scr(6)=ig
            j=6
            ibase=6
-           do inor=1,nor(ig)
+           do inor=1,2*nor(ig)
              j=j+1
-             scr(j)=prosig(inor,ipar,ig)
+             if (inor.le.nor(ig)) then
+                scr(j)=prosig(inor,1,ig) ! weight
+             else 
+                scr(j)=prosig(inor-nor(ig),ipar,ig) ! base point
+             endif
              if((j.ge.npage+ibase).or.(j-6.eq.lim)) then
                if(ibase.ne.0) then
                  call listio(0,nout,0,scr,nb,j)
@@ -793,7 +804,7 @@ contains
          enddo ! ig
          call asend(nout,0)
        enddo ! ipar
-       call tomend(nin,nout,0,scr)
+       call amend(nout,0)
      endif
      deallocate(prosig)
      call tomend(npendf,0,0,scr)
