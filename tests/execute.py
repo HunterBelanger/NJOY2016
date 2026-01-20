@@ -10,24 +10,24 @@ from math import isclose
 
 floatPattern = re.compile("""(
                                 (
-                                    [-+]?                               # sign (optional)
-                                    \d+                                 # digit(s)
+                                    [-+]?				# sign (optional)
+                                    \d+					# digit(s)
                                 )
                                 (
                                     \.              # period
-                                    \d+                     # digit(s)
+                                    \d+  		    # digit(s)
                                 )?                  # period+digits  (optional)
                                 (
-                                    ([eE])?                     # designation (optional)
-                                    [-+]                        # sign (required)
-                                    \d+                         # digit(s) (required)
-                                )?                                      # exponent (optional)
+                                    ([eE])?			# designation (optional)
+                                    [-+]			# sign (required)
+                                    \d+				# digit(s) (required)
+                                )? 					# exponent (optional)
                             )
                           """, re.VERBOSE)
 datePattern = re.compile(r'\d{2}/\d{2}/\d{2}')
 
 
-def lineEquivalence(ref, trial, n, relativeError=1E-9, absoluteError=1E-6):
+def lineEquivalence(ref, trial, n, relativeError=1E-9, absoluteError=1E-10):
     """
     Look to see if two lines (ref and trial) are identical. Returns a boolean.
     """
@@ -70,7 +70,7 @@ def lineEquivalence(ref, trial, n, relativeError=1E-9, absoluteError=1E-6):
 
 
 def identicalLines(refLines, trialLines, diffFile,
-                   relativeError=1E-9, absoluteError=1E-6):
+                   relativeError=1E-9, absoluteError=1E-10):
     """
     Look at two lists of strings (presumably lines from two files) and compare
     them; that is, determine if they are the same within the given tolerance.
