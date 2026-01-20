@@ -177,7 +177,6 @@ contains
    call contio(nendf,0,0,b,nb,nw)
    lrel = l1h
    nver=n2h
-   write(*,*) "library: ", nlib, nver, ".",lrel
    !-- end of Jan 2026 edit
 
    !--assign scratch files
@@ -8697,12 +8696,10 @@ contains
                      if (law.eq.1.and.ep.lt.zero) then 
                         if (nlib.eq.0.and.nver.eq.8.and.lrel.eq.1) then
                             !-- convert to the (negated) binding energy value
-                            write(*,*) "converting ", ep
                             ep=ep+ei*awr/(awr+1)
                             call mess('acelp',&
                                       'Handling ENDF-8.1 discrete primary gamma ',&
                                       'format by converting to JENDL format')
-                           write(*,*) "  to : ", ep
                         endif
                      endif
                      !-- end of Jan 2026 modification
