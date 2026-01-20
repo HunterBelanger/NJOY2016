@@ -8697,7 +8697,7 @@ contains
                         if (nlib.eq.0.and.nver.eq.8.and.lrel.eq.1) then
                             !-- convert to the (negated) binding energy value
                             ep=ep+ei*awr/(awr+1)
-                            call mess('acelp',&
+                            call mess('acelpp',&
                                       'Handling ENDF-8.1 discrete primary gamma ',&
                                       'format by converting to JENDL format')
                         endif
