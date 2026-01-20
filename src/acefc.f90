@@ -45,6 +45,11 @@ module acefc
    integer::mt103,mt104,mt105,mt106,mt107
    integer::mpmin,mpmax,mdmin,mdmax,mtmin,mtmax,m3min,m3max,m4min,m4max
 
+   !-- Modification Jan 2026 by A. Lewis
+   !-- adding variables to hold the library and version
+   integer::nlib,lrel,nver
+   !-- end of Jan 2026 modification
+
    ! record parameters for Type-2 binary files
    integer::ner,nbw
 
@@ -152,6 +157,11 @@ contains
    call repoz(nendf)
    call tpidio(nendf,0,0,b,nb,nw)
    call contio(nendf,0,0,b,nb,nw)
+   !-- Modification Jan 2026 by A. Lewis
+   !-- get library 
+   nlib = n1h
+   !-- end of Jan 2026 edit
+
    call contio(nendf,0,0,b,nb,nw)
    if (n1h.ne.0) then
       iverf=4
@@ -161,6 +171,14 @@ contains
       iverf=6
    endif
    write(nsyso,'(/'' using endf-'',i1,'' format'')') iverf
+
+   !-- Modification Jan 2026 by A. Lewis
+   !-- get library release 
+   call contio(nendf,0,0,b,nb,nw)
+   lrel = l1h
+   nver=n2h
+   write(*,*) "library: ", nlib, nver, ".",lrel
+   !-- end of Jan 2026 edit
 
    !--assign scratch files
    mscr=10
@@ -8669,6 +8687,25 @@ contains
                                  'reset to 1.e-5 eV')
                         ep=1.e-5_kr
                      endif
+                     !-- Modification Jan 2026 A. Lewis
+                     !-- ENDF-8.1 formats primary gamma energy as the outgoing
+                     !-- energy at each incident energy. JENDL (and JEFF) format
+                     !-- them as the binding energy. NJOY expects the binding 
+                     !-- energy so this logic changes the value if the evaluation
+                     !-- is from ENDF-8.1. This will hopefully be resolved before
+                     !-- the next ENDF release. 
+                     if (law.eq.1.and.ep.lt.zero) then 
+                        if (nlib.eq.0.and.nver.eq.8.and.lrel.eq.1) then
+                            !-- convert to the (negated) binding energy value
+                            write(*,*) "converting ", ep
+                            ep=ep+ei*awr/(awr+1)
+                            call mess('acelp',&
+                                      'Handling ENDF-8.1 discrete primary gamma ',&
+                                      'format by converting to JENDL format')
+                           write(*,*) "  to : ", ep
+                        endif
+                     endif
+                     !-- end of Jan 2026 modification
                      if (law.eq.2) ep=ep-awr*ei/(awr+1)
                      dise(ki)=ep
                      if (ki.gt.1) then
@@ -8691,6 +8728,20 @@ contains
                                  'reset to 1.e-5 eV')
                         ep=1.e-5_kr
                      endif
+                     !-- Modification Jan 2026 A. Lewis
+                     !-- ENDF-8.1 formats primary gamma energy as the outgoing
+                     !-- energy at each incident energy. JENDL (and JEFF) format
+                     !-- them as the binding energy. NJOY expects the binding 
+                     !-- energy so this logic changes the value if the evaluation
+                     !-- is from ENDF-8.1. This will hopefully be resolved before
+                     !-- the next ENDF release 
+                     if (law.eq.1.and.ep.lt.zero) then 
+                        if (nlib.eq.0.and.nver.eq.8.and.lrel.eq.1) then
+                            !-- convert to the (negated) binding energy value
+                            ep=ep+ei*awr/(awr+1)
+                        endif
+                     endif
+                     !-- end of Jan 2026 modification
                      if (law.eq.2) ep=ep-awr*ei/(awr+1)
                      if (ki.gt.1.) then
                         if (ep.eq.scr(5+2*(ki-1)))&
@@ -8703,7 +8754,7 @@ contains
                      !--found a new discrete energy.  insert it into
                      !--the existing dise array, making sure to
                      !--maintain a highest to lowest energy order.
-                     if (abs(scr(5+2*ki)).gt.abs(dise(1))) then
+                     if (abs(ep).gt.abs(dise(1))) then
                         do m=nd0,1,-1
                            dise(m+1)=dise(m)
                         enddo
@@ -8827,8 +8878,17 @@ contains
             !--photon.
             if (nd0.ne.0.and.nd.eq.nd0) then
                do nn=1,nd
-                  if (law.eq.1.and.scr(5+2*nn).lt.zero)&
-                               scr(5+2*nn)=-scr(5+2*nn)+ei*awr/(awr+1)
+                  if (law.eq.1.and.scr(5+2*nn).lt.zero) then
+                     !-- Modification Jan 2026 A. Lewis
+                     !-- if ENDF8.1, don't need to convert to gamma energy
+                     !-- from binding energy - just negate
+                     if (nlib.eq.0.and.nver.eq.8.and.lrel.eq.1) then
+                        scr(5+2*nn)=-scr(5+2*nn)
+                     else
+                        scr(5+2*nn)=-scr(5+2*nn)+ei*awr/(awr+1)
+                     endif
+                     !-- end of Jan 2026 modification
+                  endif
                enddo
             elseif (nd0.ne.0.and.nd.ne.nd0) then
                !--if nd=0 then must insert all discrete photons
@@ -8865,7 +8925,17 @@ contains
                   !--to account for the incident neutron energy.
                   do m=nd0,1,-1
                      ep=dise(m)
-                     if (law.eq.1.and.ep.lt.zero)ep=-ep+ei*awr/(awr+1)
+                     if (law.eq.1.and.ep.lt.zero) then 
+                        !-- Modification Jan 2026 A. Lewis
+                        !-- if ENDF8.1, don't need to convert to gamma energy
+                        !-- from binding energy - just negate
+                        if (nlib.eq.0.and.nver.eq.8.and.lrel.eq.1) then
+                           ep=-ep
+                        else
+                           ep=-ep+ei*awr/(awr+1)
+                        endif
+                        ! end of Jan 2026 modification
+                     endif
                      if (law.eq.2)ep=ep+ei*awr/(awr+1)
                      scr(5+2*m)=ep
                      scr(6+2*m)=zero
