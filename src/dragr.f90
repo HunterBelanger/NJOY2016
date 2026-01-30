@@ -2698,7 +2698,7 @@ contains
    if(math.eq.0) go to 400
    if((mfh.ne.0).and.(mth.ne.0)) call skiprz(ndcy,-1)
    do
-   500 call contio(ndcy,0,0,scr,nb,nw)
+     500 call contio(ndcy,0,0,scr,nb,nw)
      if(math.eq.-1) then
        go to 700
      else if(mfh.ne.1) then

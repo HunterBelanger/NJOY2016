@@ -278,7 +278,7 @@ contains
    subroutine calurr(maxnor,nbinpt,nunr,nbdil,npar,lssf,ep,eneurr,scr2a, &
    & scr2b,factor,momt,momp,ndil,dilut,proref,sefr)
    !-------------------------------------------------------------------
-   ! Compute cross section moments in the unresolved resonance rang
+   ! Compute cross section moments in the unresolved resonance range
    !-------------------------------------------------------------------
    use util ! provides error
    ! externals
@@ -573,7 +573,8 @@ contains
        ep=min(enext,ener(ig+1))
        eplog=log(eres1/ep)
        call gety1(ep,enext,idis,tp,npendf,scr1)
-       if((irflag_2.eq.0).or.(ep.le.urlimit)) then
+       if((irflag_2.eq.0).or.(ep*(1.0d0-1.0d-6).le.urlimit)) then
+         ! perform a Riemann integration using RECONR data
          npanel(ig)=npanel(ig)+1
          nener=nener+1
          if(nener.gt.maxbin) then
@@ -598,7 +599,13 @@ contains
            sefr(2,idil,ig)=sefr(2,idil,ig)+factor*sigt
          enddo
        else
-         npanel(ig)=-1
+         ! perform a Lebesgue integration using PURR data
+         if(npanel(ig).le.0) then
+           npanel(ig)=-1
+         else
+           ! the additional panel holds the Lebesgue contribution
+           npanel(ig)=npanel(ig)+1
+         endif
          factor=emlog-eplog
          call calurr(maxnor,nbinpt,nunr,nbdil,npar,lssf,ep,eneurr,scr2a, &
          & scr2b,factor,momt(1,ig),momp(1,1,ig),ndil,dilut,proref(1,ig,itm), &
@@ -643,7 +650,7 @@ contains
              write(hsmg,'(21hinvalid index for mt=,i3)') mt
              call error('calpt',hsmg,' ')
            endif
-           if((irflag_2.eq.0).or.(ep.le.urlimit)) then
+           if((irflag_2.eq.0).or.(ep*(1.0d0-1.0d-6).le.urlimit)) then
              iener=iener+1
              if(iener.gt.nener) exit
              ep=ekep(1,iener)
@@ -785,9 +792,9 @@ contains
            ibase=6
            do inor=1,2*nor(ig)
              j=j+1
-             if (inor.le.nor(ig)) then
+             if(inor.le.nor(ig)) then
                 scr(j)=prosig(inor,1,ig) ! weight
-             else 
+             else
                 scr(j)=prosig(inor-nor(ig),ipar,ig) ! base point
              endif
              if((j.ge.npage+ibase).or.(j-6.eq.lim)) then
