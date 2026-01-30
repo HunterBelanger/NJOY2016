@@ -82,6 +82,8 @@ program njoy
 !
 ! calenr...add CALENDF probability tables to the GENDF tape.
 !
+! eccor ...generate an eccolib for ERANOS.
+!
 ! Each processing module is implemented as a Fortran-90 module with
 ! only one public subroutine named as above.  The modules have the
 ! names as given above with "m" instead of "r".  Processing modules
