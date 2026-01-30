@@ -98,6 +98,7 @@ ctest -R drag01 -V
 +  `GASPR` generates gas-production cross sections in pointwise format from basic reaction data in an ENDF evaluation. These results can be converted to multigroup form using `GROUPR`, passed to `ACER`, or displayed using `PLOTR`.
 +  `CALENR` generates CALENDF probability tables and store them in a GENDF tape.
 +  `DRAGR` generates a Draglib-formatted cross-section library for the lattice code DRAGON.
++  `ECCOR` generates an Eccolib-formatted cross-section library for the lattice code ECCO.
 
 ## License and Copyright
 This software is distributed and copyrighted according to the [LICENSE](LICENSE) file.
