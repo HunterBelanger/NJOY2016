@@ -147,6 +147,7 @@ program njoy
    use gaspm   ! provides gaspr
    use dragm   ! provides dragr
    use calenm  ! provides calenr
+   use eccom   ! provides eccor
 
    implicit none
    character(6)::module
@@ -276,6 +277,9 @@ program njoy
 
       case('calenr') ! generate CALENDF probability tables
          call calenr
+
+      case('eccor')  ! generate an eccolib for ERANOS
+         call eccor
 
       case ('--')    ! comment card; nothing to do
 
