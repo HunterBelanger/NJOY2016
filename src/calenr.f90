@@ -278,7 +278,7 @@ contains
    subroutine calurr(maxnor,nbinpt,nunr,nbdil,npar,lssf,ep,eneurr,scr2a, &
    & scr2b,factor,momt,momp,ndil,dilut,proref,sefr)
    !-------------------------------------------------------------------
-   ! Compute cross section moments in the unresolved resonance range
+   ! Compute cross section moments in the unresolved resonance rang
    !-------------------------------------------------------------------
    use util ! provides error
    ! externals
@@ -573,8 +573,7 @@ contains
        ep=min(enext,ener(ig+1))
        eplog=log(eres1/ep)
        call gety1(ep,enext,idis,tp,npendf,scr1)
-       if((irflag_2.eq.0).or.(ep*(1.0d0-1.0d-6).le.urlimit)) then
-         ! perform a Riemann integration using RECONR data
+       if((irflag_2.eq.0).or.(ep.le.urlimit)) then
          npanel(ig)=npanel(ig)+1
          nener=nener+1
          if(nener.gt.maxbin) then
@@ -599,13 +598,7 @@ contains
            sefr(2,idil,ig)=sefr(2,idil,ig)+factor*sigt
          enddo
        else
-         ! perform a Lebesgue integration using PURR data
-         if(npanel(ig).le.0) then
-           npanel(ig)=-1
-         else
-           ! the additional panel holds the Lebesgue contribution
-           npanel(ig)=npanel(ig)+1
-         endif
+         npanel(ig)=-1
          factor=emlog-eplog
          call calurr(maxnor,nbinpt,nunr,nbdil,npar,lssf,ep,eneurr,scr2a, &
          & scr2b,factor,momt(1,ig),momp(1,1,ig),ndil,dilut,proref(1,ig,itm), &
@@ -650,7 +643,7 @@ contains
              write(hsmg,'(21hinvalid index for mt=,i3)') mt
              call error('calpt',hsmg,' ')
            endif
-           if((irflag_2.eq.0).or.(ep*(1.0d0-1.0d-6).le.urlimit)) then
+           if((irflag_2.eq.0).or.(ep.le.urlimit)) then
              iener=iener+1
              if(iener.gt.nener) exit
              ep=ekep(1,iener)
@@ -765,20 +758,19 @@ contains
          endif
          igmax=0
          do ig=igres0,igres1
-           if(proref(max(1,ipar-1),ig,itm).ne.0.0) igmax=ig
+           if(proref(ipar-1,ig,itm).ne.0.0) igmax=ig
          enddo
          if(igmax.eq.0) cycle
-         igmax=igres1 ! to make ecco happy
          scr(1)=za
          scr(2)=awr
          scr(3)=1
          scr(4)=1
          scr(5)=0
-         scr(6)=igmax
+         scr(6)=ng
          call contio(0,nout,0,scr,nb,nw)
-         do ig=igres0,igmax
+         do ig=igres0,igres1
            if(ipar.gt.2) then
-             if(proref(max(1,ipar-1),ig,itm).eq.0.0) cycle
+             if(proref(ipar-1,ig,itm).eq.0.0) cycle
            endif
            nw=6
            lim=2*nl*nz*nor(ig)
@@ -792,7 +784,7 @@ contains
            ibase=6
            do inor=1,2*nor(ig)
              j=j+1
-             if(inor.le.nor(ig)) then
+             if (inor.le.nor(ig)) then
                 scr(j)=prosig(inor,1,ig) ! weight
              else
                 scr(j)=prosig(inor-nor(ig),ipar,ig) ! base point
@@ -809,6 +801,19 @@ contains
              endif
            enddo ! inor
          enddo ! ig
+         if(igmax.lt.ng) then
+           ! add one group with nor=1 to make ecco happy
+           scr(1)=temps
+           scr(2)=0
+           scr(3)=2
+           scr(4)=1
+           scr(5)=2
+           scr(6)=ng
+           scr(7)=1.0
+           scr(8)=proref(ipar,ng,itm)
+           j=8
+           call listio(0,nout,0,scr,nb,j)
+         endif
          call asend(nout,0)
        enddo ! ipar
        call amend(nout,0)
