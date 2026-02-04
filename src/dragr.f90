@@ -5,7 +5,6 @@ module dragm
    implicit none
    private
    type(xsm_file),pointer :: draglib
-   character(len=8) :: fname
    public dragr
 
    ! random number generator for unresolved energy domain
@@ -131,8 +130,8 @@ contains
    character(len=4) labell(18)
    character(len=150) hsmg
    integer i,ig,igaut0,igaut1,igrest,igres0,igres1,igecco,iig,ipflag,iza, &
-   & nb,nbesp,ndcy,nendf,nexpo,nfp,nimpo,npen,nw,ilong,ilong1,ityxsm,inew, &
-   & irflag,idecay,iprint,ner,igar(1),impy
+   & nb,nbesp,ndcy,nendf,nexpo,nfp,nimpo,npen,nw,ilong,ilong1,ityxsm,irflag, &
+   & idecay,iprint,ner,igar(1),impy
    logical lsame,lurr,lkerma,lexist,lres
    real(kr) ener(maxgr+1),eesp(maxesp+1),delecco,delig,eh
    real eespi(maxesp+1),gar(1)
@@ -1451,8 +1450,8 @@ contains
    use util   ! provides error
    integer, intent(in) :: nendf,ngen,matno,nz0,ng,igfirs,iglast
    real(kr), intent(in) :: ytemp
-   integer :: maxa,maxgr,maxnl,maxnz,maxedi,nb,nw,ngtmp,nl,nz
-   parameter (maxa=3000,maxgr=2000,maxnl=8,maxnz=30,maxedi=12)
+   integer :: maxa,maxgr,maxnl,maxnz,maxedi,nb,nw,ngtmp,nl,nz,lz
+   parameter (maxa=3000,maxgr=2000,maxnl=8,maxnz=30,maxedi=12,lz=6)
    integer ied,ig,igmax,iz,nztmp
    logical lfind,exist,lfiss
    real(kr) kap
@@ -1505,10 +1504,26 @@ contains
        & (mth.eq.malist2(ied)))
      enddo
      if(.not.lfind) cycle
-     kap=0.0
      ! recover the Q or pseudo-Q of the reaction (may be negative)
      call contio(nendf,0,0,scr,nb,nw)
      kap=c1h
+     if(mth.eq.18) then
+       ! ***fission -- recover pseudo-Q kappa info in mf=1, mt=458 if exists
+       call repoz(nendf)
+       lfind=.false.
+       do while (.not.lfind)
+         if(nendf.lt.0) then
+           read(-nendf,end=30) math,mfh,mth,nb,nw
+         else if(nendf.gt.0) then
+           read(nendf,'(66x,i4,i2,i3,i5)',end=30) math,mfh,mth,nsp
+         endif
+         lfind=(math.eq.matno).and.(mfh.eq.1).and.(mth.eq.458)
+       enddo
+       if(lfind) then
+         call listio(nendf,0,0,scr,nb,nw)
+         kap=scr(lz+15)
+       endif
+     endif
      if(kap.eq.0.0) cycle
      do ig=1,ng
        sigq(ig,1)=sigq(ig,1)+kap*rv(ig,1,1)
