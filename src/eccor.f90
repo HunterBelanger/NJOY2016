@@ -5216,7 +5216,7 @@ contains
   !
   subroutine ecfil50
   ! .. local scalars ..
-  integer nb,nw,scapt,i,ig,im,ll,mg,ngipt,nor,ntempj
+  integer nb,nw,scapt,i,ig,im,ll,mg,ngipt,nor,ntempj,jc
   character*16 reac,blank
   real(kr) totcap,diff,totela,totsum
   logical ifail,mt101
@@ -5237,97 +5237,120 @@ contains
   !----
   !  zeroise arrays
   !----
-  if(ntempj==1)then
-    ishld(tmpmax,ngrmax)=0
-    prosig(maxxs,maxord,tmpmax,ngrmax)=0.d0
-    weight(maxord,tmpmax,ngrmax)=0.d0
+  if(ntempj==1) then
+    ishld(:tmpmax,:ngrmax)=0
+    prosig(:maxxs,:maxord,:tmpmax,:ngrmax)=0.d0
+    weight(:maxord,:tmpmax,:ngrmax)=0.d0
   endif
   !----
-  !  start loop over reactions on tape ning
+  !  start loop over sections on tape ning
   !----
   10 call contio(ning,0,0,buff,nb,nw)
   if(mfh==50) then
-    ngipt=n2h
     npmc=npmc+1
-    !----
-    !  start loop over groups on tape ning
-    !----
+    if(l2h>maxord) then
+      write(hsmg,'(35hmaximum order of probability table=,i5, &
+      & 18h; maximum allowed=,i5)') l2h,maxord
+      call error('ecfil50',hsmg,' ')
+    endif
     140 ll = 1
     call listio(ning,0,0,buff(1),nb,nw)
     150 if(nb/=0) then
       if((ll+nw)>maxnbf) then
         write(nsyso,1020)
-        call error('ecfil50','work space exceeded reading sub-group data',' ')
+        call error('ecfil50','work space exceeded reading subgroup data',' ')
       endif
       ll = ll + nw
       call moreio(ning,0,0,buff(ll),nb,nw)
       go to 150
     endif
+    if(mth==101) mt101=.true.
     nor = l2h
-    if(nor>maxord)then
-      write(hsmg,'(35hmaximum order of probability table=,i5, &
-      & 18h; maximum allowed=,i5)') nor,maxord
-      call error('ecfil50',hsmg,' ')
-    endif
     ig = n2h
-    mg = ngi-ig+1
+    mg=ngi-ig+1
+    !----
+    !  write this group away to prosig
+    !  nor=1 for final group
+    !----
+    if(nor>1) then
+      ishld(ntempj,mg)=nor
+      if( (mth==1).or.(mth==2).or.(mth==4).or.(mth==16).or.(mth==17).or. &
+      & (mth==18).or.(mth==101).or.(.not.mt101.and.mth==102) ) then
+        jc=6
+        !----
+        !  read weight
+        !----
+        if(mth==1) weight(:nor,ntempj,mg) = buff(jc+1:jc+nor)
+        !----
+        !  read cross-section
+        !----
+        jc=jc+nor
+        if((mth==16).or.(mth==17)) then
+          ! sumup (n,2n) and (n,3n)
+          prosig(npmc,:nor,ntempj,mg) = prosig(npmc,:nor,ntempj,mg) + &
+          & buff(jc+1:jc+nor)
+        else
+          prosig(npmc,:nor,ntempj,mg) = buff(jc+1:jc+nor)
+        endif
+      endif
+    endif
+    if(ig<ngi) go to 140
     if(mth==1) then
       reac='TOTAL'
       call search(reac,ipmc(npmc),listmi,nsmic)
       if(iprint>0) write(nsyso,910) mth,blank,blank,listmi(ipmc(npmc))
-      weight(:nor,ntempj,mg) = buff(:nor)
-      prosig(npmc,:nor,ntempj,mg) = buff(nor+1:2*nor)
     else if(mth==2) then
       reac='ELASTIC'
       call search(reac,ipmc(npmc),listmi,nsmic)
-      if(iprint>0) write(nsyso,910) mth,blank,blank,listmi(ipmc(npmc))
-      prosig(npmc,:nor,ntempj,mg) = buff(nor+1:2*nor)
+      selas=npmc
+      if(iprint>0) write(nsyso,910) mth,listmi(ipmc(npmc)),'total           '
     else if(mth==4) then
       reac='INELASTIC'
       call search(reac,ipmc(npmc),listmi,nsmic)
-      if(iprint>0) write(nsyso,910) mth,blank,blank,listmi(ipmc(npmc))
-      prosig(npmc,:nor,ntempj,mg) = buff(nor+1:2*nor)
+      sinel=npmc
+      if(iprint>0) write(nsyso,910) mth,listmi(ipmc(npmc)),'total           '
     else if((mth==16).or.(mth==17)) then
       reac='N,XN'
       call search(reac,ipmc(npmc),listmi,nsmic)
-      if(iprint>0) write(nsyso,910) mth,blank,blank,listmi(ipmc(npmc))
-      prosig(npmc,:nor,ntempj,mg)=prosig(npmc,:nor,ntempj,mg)+buff(nor+1:2*nor)
+      if(iprint>0) write(nsyso,910) mth,listmi(ipmc(npmc)),'total           '
     else if(mth==18) then
       reac='FISSION'
       call search(reac,ipmc(npmc),listmi,nsmic)
-      if(iprint>0) write(nsyso,910) mth,blank,blank,listmi(ipmc(npmc))
-      prosig(npmc,:nor,ntempj,mg) = buff(nor+1:2*nor)
-    else if(mth==102) then
+      if(iprint>0) write(nsyso,910) mth,listmi(ipmc(npmc)),'total           '
+    else if(mth==101.or.(.not.mt101.and.mth==102)) then
       reac='CAPTURE'
+      scapt = npmc
       call search(reac,ipmc(npmc),listmi,nsmic)
-      if(iprint>0) write(nsyso,910) mth,blank,blank,listmi(ipmc(npmc))
-      prosig(npmc,:nor,ntempj,mg) = buff(nor+1:2*nor)
+      if(iprint>0) write(nsyso,910) mth,listmi(ipmc(npmc)),'total           '
     else
-      write(hsmg,'(29hno probability table for mth=,i4)') mth
-      call error('ecfil50',hsmg,' ')
+      !----
+      !  reaction not recognised
+      !----
+      if(iprint>0) write(nsyso,fmt=1010) mfh,mth,ntempj
+      npmc = npmc - 1
     endif
-    if(ig<ngipt) go to 140
     call tosend(ning,0,0,buff)
     go to 10
+    !
   else
     !----
-    ! check if end of mf has been reached
+    !  check if end of mfh has been reached
     !----
-    if(mfh/=0) call error('ecfil50','fend not reached',' ')
-    call skiprz(ning,-1)
+    if(mfh/=0) call skiprz(ning,-1)
     go to 20
   endif
   !-----end loop over sections on tape ning
+  20 continue
   !******************************************************************
   !*  compare capture calculated from the sub group data with total *
   !*  capture from summing the capture partials.                    *
   !*  replace primary capture cross sections with values from       *
   !* sub group data when present.                                   *
   !******************************************************************
-  20 if(scapt/=0)then
+  if(scapt/=0)then
     if(iprint>0) write(nsyso,1140)
     do mg = 1,ngi
-      totcap = 0.0
+     totcap = 0.0
       nor = ishld(ntempj,mg)
       if( nor>=1 ) then
         do im = 1,nor
@@ -5335,7 +5358,7 @@ contains
         enddo
         diff = abs((xsec(ncapt,ntempj,mg)-totcap))/totcap*100.
         if((diff>1.0).and.(iprint>0)) then
-          write(nsyso,1090) mg,xsec(ncapt,ntempj,mg),totcap,diff
+          write(nsyso,1090)mg,xsec(ncapt,ntempj,mg),totcap,diff
         endif
         !----
         !  correct total
@@ -5362,9 +5385,9 @@ contains
           totela = totela + weight(im,ntempj,mg)*prosig(selas,im,ntempj,mg)
         enddo
         diff = abs((xsec(nelas,ntempj,mg)-totela))/totela*100.
-        if(iprint>0) write(nsyso,1090) mg,xsec(nelas,ntempj,mg),totela,diff
+        write(nsyso,1090)mg,xsec(nelas,ntempj,mg),totela,diff
         !----
-        !  correct sub group data
+        !  correct  subgroup data
         !----
         do im=1,nor
           ! correct total
@@ -5379,7 +5402,7 @@ contains
     enddo
   endif
   !----
-  !  check totals are consistent
+  !  check if totals are consistent
   !----
   if(iprint>0) write(nsyso,1100)
   if(iprint>0) write(nsyso,1120)
@@ -5391,7 +5414,10 @@ contains
         totsum = totsum + weight(im,ntempj,mg)*prosig(1,im,ntempj,mg)
       enddo
       diff = abs((xsec(ntotal,ntempj,mg)-totsum))/totsum*100.
-      if(diff>1.0)ifail = .true.
+      if(diff>1.0)then
+        ifail = .true.
+        if(iprint>0) write(nsyso,1090) mg,xsec(ntotal,ntempj,mg),totsum,diff
+      endif
       prosig(1,im,ntempj,mg) = prosig(1,im,ntempj,mg)*xsec(ntotal,ntempj,mg)/ &
       & totsum
     endif
@@ -5404,7 +5430,7 @@ contains
     endif
   endif
   !----
-  !  set up ipmc to include TRANSPORT
+  !  set up ipmc to include transport
   !----
   npmc=npmc+1
   reac='TRANSPORT'
@@ -5415,9 +5441,7 @@ contains
   if(iprint>0) write(nsyso,1050)
   if(iprint>0) write(nsyso,1060)(listmi(ipmc(i)),i=1,npmc)
   return
-  !----
-  !  formats
-  !----
+  !
   900 format ('  mt',3x,'reaction',22x,'cross-check/comment'/'  ==',3x, &
   & '========',22x,'==================='/)
   910 format (1x,i3,2x,8a16,/)
