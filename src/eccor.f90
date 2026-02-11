@@ -1166,6 +1166,8 @@ contains
     call find(mat,50,0,ning,found)
     if(found) call ecfil50
     call tomend(ning,0,0,buff)
+    call skiprz(ning,-1)
+    call contio(ning,0,0,buff,nb,nw)
   endif
   if(math==-1) then
     go to 40
@@ -1845,6 +1847,8 @@ contains
     call find(mat,50,0,ning,found)
     if(found) call ecfil50
     call tomend(ning,0,0,buff)
+    call skiprz(ning,-1)
+    call contio(ning,0,0,buff,nb,nw)
   endif
   if(math==-1) then
     go to 100
@@ -5123,13 +5127,10 @@ contains
   !  read gendf
   !----
   10 call contio(ning,0,0,buff,nb,nw)
-  if(iprint>0) write(nsyso,*) 'etiquette 10  contio '
   if(mfh==6) then
     if(ntrouve(mth,mtherm,ntherm)/=0) then
-      if(iprint>0) write(nsyso,*) 'mf ',mfh,' mt ',mth
       nleg = l1h
       nsig = l2h
-      if(iprint>0) write(nsyso,*) 'nleg ',nleg,' nsig ',nsig
       !
       ! thermal upscatter matrix
       if((nleg)/=npne(melas))then
