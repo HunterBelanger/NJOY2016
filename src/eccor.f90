@@ -171,8 +171,9 @@ contains
   !
   !-----------------------------------------------------------------
   ! .. local scalars ..
-  integer nbuff(1024),i,ifis,irect,lrecl,lsblk,lwordc,lwordi,lwordr, &
-  & maxblk,maxm,maxp,mbuf,mreci,nfis,nreci,nrect,ntfis,thdim1,thrmin
+  integer(k8) nbuff(1024)
+  integer i,ifis,irect,lrecl,lsblk,lwordc,lwordi,lwordr,maxblk,maxm,maxp, &
+  & mbuf,mreci,nfis,nreci,nrect,ntfis,thdim1,thrmin
   logical lcreate
   character fertil*4,fissil*4,nonfis*4,chdate*8,sysour*16,type*16,title*80, &
   & text6*6
@@ -624,7 +625,7 @@ contains
   nopt,npri,nrange,ns,nsgp,ntopg,loc,nb,nw,nz,nfr2,nmisc2,nsmtx2,nsmic2
   logical found
   ! .. local arrays ..
-  integer nbuff(maxnbf)
+  integer(k8) nbuff(maxnbf)
   real(kr) buff(maxnbf),awt(maxel),dis(maxel),ecg(maxel),ecng(maxel), &
   & efg(maxel),efng(maxel),eg(nggmax)
   integer lfr(maxnfr),lrec(3,4)
@@ -1004,9 +1005,9 @@ contains
   tnmin(tmpmax,maxthr)
   ! .. local scalars ..
   real(kr) buff(maxnbf),atemp,comp,emax,emin,fe,totspc,za
-  integer nbuff(maxnbf),i,ielp,ielr,if,itempj,j,l,lbuff,msmc,msmtx,nb,nbl, &
-  & ncards,ndil,nfrecs,ngg,npnfp,nreg,nsmxj,nspge,ntempj,ntw,nw,nword2,mg, &
-  & mbuf,mat
+  integer(k8) nbuff(maxnbf)
+  integer i,ielp,ielr,if,itempj,j,l,lbuff,msmc,msmtx,nb,nbl,ncards,ndil, &
+  & nfrecs,ngg,npnfp,nreg,nsmxj,nspge,ntempj,ntw,nw,nword2,mg,mbuf,mat
   logical fision,found
   data fision/.false./,found/.false./
   ! .. local arrays ..
@@ -1590,9 +1591,10 @@ contains
   data    fision/.false./,found/.false./
   ! .. local arrays ..
   real(kr) buff(maxnbf),btemp(10),flux(ngrmax),sdil(10)
-  integer nbuff(maxnbf),ielp1(maxel),ielr1(maxel),ifis1(maxel),lrec(3,maxel), &
-  nfre1(maxel),ngmax1(ngrmax),nmax(ngrmax+1),npmc1(maxel),nsmc1(maxel), &
-  nspge1(maxel),ntfis1(maxel)
+  integer(k8) nbuff(maxnbf)
+  integer ielp1(maxel),ielr1(maxel),ifis1(maxel),lrec(3,maxel),nfre1(maxel), &
+  ngmax1(ngrmax),nmax(ngrmax+1),npmc1(maxel),nsmc1(maxel),nspge1(maxel), &
+  ntfis1(maxel)
   character(len=16) cbuff(maxcbf)
   ! .. intrinsic functions ..
   intrinsic abs
@@ -2353,7 +2355,8 @@ contains
   pp,ppos,ppos2,ppos3,tot1,tot2,totmat,totord,totrf,totsub,totxs,xpos
   logical ifail
   ! .. local arrays ..
-  integer nbuff(maxnbf),lrec(3,9000),morder(6),ntot(ngblk),orec(3,9000)
+  integer(k8) nbuff(maxnbf)
+  integer lrec(3,9000),morder(6),ntot(ngblk),orec(3,9000)
   ! .. intrinsic functions ..
   intrinsic abs
   !
@@ -3174,7 +3177,8 @@ contains
   ,totord,totrf,totsub,totxs,xpos
   logical ifail
   ! .. local arrays ..
-  integer nbuff(maxnbf),lrec(3,9000),morder(6),ntot(ngblk)
+  integer(k8) nbuff(maxnbf)
+  integer lrec(3,9000),morder(6),ntot(ngblk)
   real(kr) buff(maxnbf)
   ! .. intrinsic functions ..
   intrinsic abs
@@ -3322,9 +3326,7 @@ contains
     !  update buffer array with ing(ibl) ishld values
     do ig = ingmin,ingmax
       ! number of temperatures for this nuclide
-      do nt = 1,ntempj
-        nbuff(lbuff+nt) = ishld(nt,ig)
-      enddo
+      nbuff(lbuff+1:lbuff+ntempj) = ishld(:ntempj,ig)
       lbuff = lbuff + ntempj
     enddo
     !  update buffer array with ing(ibl) inmin values
@@ -8473,7 +8475,8 @@ contains
   ! .. local arrays ..
   real(kr) buff(nbuf),awt(maxel),dis(maxel),ecg(maxel),ecng(maxel),efg(maxel), &
   & efng(maxel),eg(ngrmax)
-  integer nbuff(nbuf),lfr(maxnfr),lrec(3,4)
+  integer(k8) nbuff(nbuf)
+  integer lfr(maxnfr),lrec(3,4)
   character listgp(5)*16,sybel(maxel)*16
   character(len=16) cbuff(maxcbf)
   !
@@ -9019,7 +9022,7 @@ contains
   integer irec,lenrec,lunit,nwords,nextn,dimabs
   ! ..
   ! .. array arguments ..
-  integer nc(nwords)
+  integer(k8) nc(nwords)
   ! ..
   ! .. local scalars ..
   integer j,jl,ju,nr,nrecs
@@ -9094,7 +9097,7 @@ contains
   ! .. scalar arguments ..
   integer irec,lenrec,lunit,nwords,nextn,dimabs
   ! .. array arguments ..
-  integer nc(nwords)
+  integer(k8) nc(nwords)
   ! .. local scalars ..
   integer j,jl,ju,nr,nrecs
   !
@@ -9159,7 +9162,9 @@ contains
     read(itape) math,mfh,mth
   endif
   ! ***test for mat
-  if((math<=0) .or. (math>mat)) then
+  if(math==0) then
+    go to 100
+  else if((math<0) .or. (math>mat)) then
     call skiprz(ntape,-1)
     return
     if(math<mat) go to 100
