@@ -288,7 +288,7 @@ contains
    & dilut(ndil),proref(npar+1),sefr(npar+2,ndil)
    ! internals
    integer :: i,iunr,iof,inor,jnor,idil,ipar,ityp
-   real(kr) :: tt,sigt,sigx,bond
+   real(kr) :: tt,sigt,sigx,bond,prodif
    integer, save, dimension(6) :: matype= &
    & (/ 1,0,0,0,2,3 /) ! purr/malist correspondance
    real(kr), allocatable, dimension(:) :: siginf,www
@@ -358,7 +358,12 @@ contains
            sigx=sig(inor,1)-sig(inor,2)-sig(inor,3)-sig(inor,4)
          endif
          ! 1: total; 2: elastic; 6: fission; 7: capture
-         sigx=sigx*proref(ipar+1)/(proref(1)-proref(2)-proref(6)-proref(7))
+         prodif=proref(1)-proref(2)-proref(6)-proref(7)
+         if(prodif.gt.1.0E-4) then
+           sigx=sigx*proref(ipar+1)/prodif
+         else
+           sigx=proref(ipar+1)
+         endif
        endif
        tt=www(inor)*sigx
        do jnor=maxnor/2+1,maxnor
