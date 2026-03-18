@@ -1,7 +1,7 @@
 # Release Notes&mdash;NJOY2016
 Given here are some release notes for NJOY2016. Each release is made through a formal [Pull Request](https://github.com/njoy/NJOY2016/pulls) made on GitHub. There are links in this document that point to each of those Pull Requests, where you can see in great details the changes that were made. Often the Pull Requests are made in response to an [issue](https://github.com/njoy/NJOY2016/issues). In such cases, links to those issues are also given.
 
-## [NJOY2016.79](https://github.com/njoy/NJOY2016/pull/xxx)
+## [NJOY2016.79](https://github.com/njoy/NJOY2016/pull/395)
 This update fixes the following issues:
   - GROUPR output now correctly distinguishes between level numbers and isomeric numbers when extracting nuclide production.
   - LEAPR now sets the EMAX value in MF1 MT451 to be equal to the B(4) value in MF7 MT4.
