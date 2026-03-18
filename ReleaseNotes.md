@@ -6,10 +6,13 @@ This update fixes the following issues:
   - GROUPR output now correctly distinguishes between level numbers and isomeric numbers when extracting nuclide production.
   - LEAPR now sets the EMAX value in MF1 MT451 to be equal to the B(4) value in MF7 MT4.
   - PURR now uses quicksort instead of bubble sort, which leads to a significant speedup in this module. This change should have no effect on the values of the probability table.
+  - ACER now correctly handles discrete primary gammas in File 6 for the ENDF/B-VIII.1 release, which uses a different format than JEFF and JENDL libraries.
 
 In addition, this update added the following features and changes:
   - Added optional card9a to GROUPR to support extracting MF=9 and MF=10 production channels with resulting level numbers greater than 9.
   - Two group structures were added to GROUPR (the apollo 99-group structure and the ecco 1962-group structure). The shem epm 295-group structure and shem cea/epm 361-group structure were updated as well.
+
+The cmake files were simplified to allow for the use of LLVM's flang compiler. A minor update was mode to GROUPR as well to allow for compilation with LLVM flang.
 
 ## [NJOY2016.78](https://github.com/njoy/NJOY2016/pull/361)
 This update fixes the following issues:
