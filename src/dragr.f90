@@ -118,7 +118,7 @@ contains
    !
    !  'interpol' keyword to set the incident neutron energy
    !  'at'       mandatory keyword to make dragr happy
-   !   energy    incident neutron energy with MT454
+   !   energy    incident neutron energy (eV) with MT454
    !
    !            repeat card 9 for all isotopes present in the
    !            burnup chain. hich='end'/ terminates the chain.
