@@ -4635,7 +4635,7 @@ contains
    if (ign.eq.26) write(nsyso,'(/&
      &  '' neutron group structure......shem cea/epm 361-group'')')
    if (ign.eq.27) write(nsyso,'(/&
-     &  '' neutron group structure......shem epm 315-group'')')
+     &  '' neutron group structure......shem epm 370-group'')')
    if (ign.eq.28) write(nsyso,'(/&
      &  '' neutron group structure......rahab aecl 89-group'')')
    if (ign.eq.29) write(nsyso,'(/&

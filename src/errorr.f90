@@ -333,7 +333,7 @@ contains
    !      24           shem cea 281-group structure
    !      25           shem epm 295-group structure
    !      26           shem cea/epm 361-group structure
-   !      27           shem epm 315-group structure
+   !      27           shem epm 370-group structure
    !      28           rahab aecl 89-group structure
    !      29           ccfe   660-group structure  (30 MeV)
    !      30           ukaea 1025-group structure  (30 MeV)
