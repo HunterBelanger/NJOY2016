@@ -1480,6 +1480,7 @@ contains
    ! initialize the sigq array.
    sigq(:maxgr,:maxnz)=0.0
    !
+   call repoz(nendf)
    call findf(matno,1,451,nendf)
    call contio(nendf,0,0,scr,nb,nw)
    call contio(nendf,0,0,scr,nb,nw)
@@ -2665,7 +2666,7 @@ contains
    & yield(nbfiss,maxfp),terp(maxen,nbfiss)
    integer, allocatable, dimension(:) :: indpf
    real(kr), allocatable, dimension(:) :: scr
-   character text6*6,hname*8,hsmg*72
+   character text6*6,hname*8
    !
    allocate(indpf(nbdpf),scr(maxa))
    ddeca(:nbiso)=0.0
