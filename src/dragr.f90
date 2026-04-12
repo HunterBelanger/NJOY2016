@@ -273,7 +273,7 @@ contains
          write(text6,'(4hdrag,i2.2)') nexpo
          call xsmop(draglib,text6,0,1)
          call openz(nimpo,0)
-         call xsmexp(draglib,nimpo,2,2,impy)
+         call xsmexp(draglib,nimpo,2,2,impy)! import
          call closz(nimpo)
        endif
        write(text6,'(4htape,i2.2)') nexpo
@@ -281,7 +281,14 @@ contains
        if(lres) then
          !** concatenate nimpo to existing nexpo
          call openz(nexpo,0)
-         call xsmexp(draglib,nexpo,2,2,impy)
+         allocate(draglib_in)
+         write(text6,'(4hdrag,i2.2)') -nexpo
+         call xsmop(draglib_in,text6,0,1)
+         call xsmexp(draglib_in,nexpo,2,2,impy) ! import
+         call xsmequ(draglib,draglib_in)
+         call xsmcl(draglib,2)
+         deallocate(draglib)
+         draglib=>draglib_in
          call closz(nexpo)
        endif
      endif
@@ -1480,7 +1487,6 @@ contains
    ! initialize the sigq array.
    sigq(:maxgr,:maxnz)=0.0
    !
-   call repoz(nendf)
    call findf(matno,1,451,nendf)
    call contio(nendf,0,0,scr,nb,nw)
    call contio(nendf,0,0,scr,nb,nw)
@@ -2666,7 +2672,7 @@ contains
    & yield(nbfiss,maxfp),terp(maxen,nbfiss)
    integer, allocatable, dimension(:) :: indpf
    real(kr), allocatable, dimension(:) :: scr
-   character text6*6,hname*8
+   character text6*6,hname*8,hsmg*72
    !
    allocate(indpf(nbdpf),scr(maxa))
    ddeca(:nbiso)=0.0
