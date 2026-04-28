@@ -1,5 +1,5 @@
 module dragm
-   ! provides subroutine dragr for NJOY2016
+   ! provides subroutine dragr for NJOY2012
    use locale
    use xsmm
    implicit none
@@ -2382,7 +2382,7 @@ contains
    character(len=4) hiso(3,maxiso)
    integer i,i1,ia,ifp,ifps,igar,ii,ile,ind,iof,ipos,iso,itext4,iz,j, &
    & jpos,k,lep1,loc,maxfp,nb,nbdpf,ninter
-   real(kr) awr,energy(maxter),za,eeee
+   real(kr) awr,energy(maxter),za,eeee,t1,t2,t3
    character hname*8,hname2*8,hsmg*131,hich(maxch)*8,text4*4
    integer,allocatable,dimension(:,:) :: idreac,ipreac
    real(kr),allocatable,dimension(:) :: ddeca,scr
@@ -2552,9 +2552,12 @@ contains
          eeee=enrgs(lep1)
          terp(lep1,nbfiss,i)=1.0
        else
+         t1=log(1.0d7/energy(i))
          do ile=2,lep1
            if(energy(i).le.enrgs(ile)) then
-             terp(ile,nbfiss,i)=(enrgs(ile)-energy(i))/(enrgs(ile)-enrgs(ile-1))
+             t2=log(1.0d7/enrgs(ile-1))
+             t3=log(1.0d7/enrgs(ile))
+             terp(ile,nbfiss,i)=(t3-t1)/(t3-t2)
              terp(ile-1,nbfiss,i)=1.0-terp(ile,nbfiss,i)
              exit
            endif
