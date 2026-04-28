@@ -2692,6 +2692,7 @@ contains
    yield(:nbfiss,:nbdpf,:ninter)=0.0
    !
    call repoz(nfp)
+   ifpss=0
    100 if(nfp.gt.0) then
      read(nfp,'(66x,i4,i2,i3)') math,mfh,mth
    else
@@ -2732,7 +2733,6 @@ contains
      lep1=l1h
      summ(:ninter)=0.0
      do ile=1,lep1
-       ifpss=0
        call listio(nfp,0,0,scr(1),nb,nw)
        nbfp=n2h
        energy=c1h
