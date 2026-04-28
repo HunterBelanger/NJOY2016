@@ -2387,7 +2387,7 @@ contains
    integer,allocatable,dimension(:,:) :: idreac,ipreac
    real(kr),allocatable,dimension(:) :: ddeca,scr
    real(kr),allocatable,dimension(:,:) :: br,dener,prate
-   real(kr),allocatable,dimension(:,:,:) :: terp,yield
+   real(kr),allocatable,dimension(:,:,:) :: yield,terp
    character(len=8),allocatable,dimension(:,:) :: hrch
    real(kr), dimension(maxen) :: enrgs
    !
@@ -2488,12 +2488,9 @@ contains
        nbiso=nbiso+1
        if(nbiso.gt.maxiso) call error('dradep','maxiso overflow',' ')
        mylist(nbiso,1)=izae
-       call dranam(izae,hname)
-       do i=1,nbch
-         if(hich(i).eq.hname) go to 160
-       enddo
      endif
-     160 call findf(math,8,454,nfp)
+     call dranam(izae,hname)
+     call findf(math,8,454,nfp)
      call contio(nfp,0,0,scr,nb,nw)
      lep1=l1h
      if(lep1.gt.maxen) then
@@ -2672,15 +2669,15 @@ contains
    use mainio ! provides nsysi,contio,nsyso,nsyse
    use endf   ! provides endf routines and variables
    use util   ! provides timer,openz,repoz,error
-   integer :: maxa,maxen,maxfis,lz
-   parameter(maxa=10000,maxen=4,maxfis=100,lz=6)
+   integer :: maxa,maxen,lz
+   parameter(maxa=10000,maxen=4,lz=6)
    integer maxfp,nbiso,nbfiss,nbdpf,ninter,nreac,nfath,nfp,ndcy,i,ia,idy, &
    & ifath,ifis,ifp,ifpp,ifps,ifpss,ile,ind,iof,iz,iza,izae,ja,jnd,jz,jzae, &
    & lep1,loc,nb,nbdy,nbfp,nw,iprint
    real(kr) za,rtyp
    integer mylist(nbiso),idreac(nreac,nbiso),ipreac(nfath,nbiso)
    real(kr) awr,energy,dener(nreac,nbiso),ddeca(nbiso),prate(nfath,nbiso), &
-   & yield(nbfiss,maxfp,ninter),terp(maxen,maxfis,ninter)
+   & yield(nbfiss,maxfp,ninter),terp(maxen,nbfiss,ninter)
    integer, allocatable, dimension(:) :: indpf
    real(kr), allocatable, dimension(:) :: summ,scr
    character text6*6,hname*8
@@ -2695,7 +2692,6 @@ contains
    yield(:nbfiss,:nbdpf,:ninter)=0.0
    !
    call repoz(nfp)
-   !ifpss=0
    100 if(nfp.gt.0) then
      read(nfp,'(66x,i4,i2,i3)') math,mfh,mth
    else
