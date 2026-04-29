@@ -1,5 +1,5 @@
 module dragm
-   ! provides subroutine dragr for NJOY2012
+   ! provides subroutine dragr for NJOY2016
    use locale
    use xsmm
    implicit none
@@ -2651,12 +2651,12 @@ contains
    & yield(nbfiss,maxfp,ninter))
    call draevo(maxfp,nbiso,nbfiss,nbdpf,ninter,nreac,nfath,mylist(1,1),nfp, &
    & ndcy,idreac,dener,ddeca,ipreac,prate,yield,terp,iprint)
+   deallocate(terp)
    !
    !**lump the burnup chain from nbiso to nbch isotopes
    call dralum(maxfp,nbiso,nbfiss,nbdpf,ninter,nreac,nfath,mylist(1,1),hiso, &
    & nbch,nbfpch,hich,hrch,br,idreac,dener,ddeca,ipreac,prate,yield,idecay, &
    & energy,iprint)
-   deallocate(terp)
    deallocate(yield,prate,ddeca,dener)
    deallocate(ipreac,idreac)
    deallocate(hrch,br,scr)
@@ -2672,15 +2672,15 @@ contains
    use mainio ! provides nsysi,contio,nsyso,nsyse
    use endf   ! provides endf routines and variables
    use util   ! provides timer,openz,repoz,error
-   integer :: maxa,maxen,lz
-   parameter(maxa=10000,maxen=4,lz=6)
+   integer :: maxa,maxen,maxfis,lz
+   parameter(maxa=10000,maxen=4,maxfis=100,lz=6)
    integer maxfp,nbiso,nbfiss,nbdpf,ninter,nreac,nfath,nfp,ndcy,i,ia,idy, &
    & ifath,ifis,ifp,ifpp,ifps,ifpss,ile,ind,iof,iz,iza,izae,ja,jnd,jz,jzae, &
    & lep1,loc,nb,nbdy,nbfp,nw,iprint
    real(kr) za,rtyp
    integer mylist(nbiso),idreac(nreac,nbiso),ipreac(nfath,nbiso)
    real(kr) awr,energy,dener(nreac,nbiso),ddeca(nbiso),prate(nfath,nbiso), &
-   & yield(nbfiss,maxfp,ninter),terp(maxen,nbfiss,ninter)
+   & yield(nbfiss,maxfp,ninter),terp(maxen,maxfis,ninter)
    integer, allocatable, dimension(:) :: indpf
    real(kr), allocatable, dimension(:) :: summ,scr
    character text6*6,hname*8
