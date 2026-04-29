@@ -114,7 +114,7 @@ contains
    !             there is no isomeric daughter)
    !  ...
    !
-   ! card 10 optional incident neutron energy (one card per incident
+   ! card 10 optional incident neutron energies (one card per incident
    ! neutron energy). By default, the most thermal neutron energy is
    ! used.
    !
@@ -2557,16 +2557,16 @@ contains
            if(energy(i).le.enrgs(ile)) then
              t2=log(1.0d7/enrgs(ile-1))
              t3=log(1.0d7/enrgs(ile))
-             terp(ile,nbfiss,i)=(t3-t1)/(t3-t2)
-             terp(ile-1,nbfiss,i)=1.0-terp(ile,nbfiss,i)
+             terp(ile-1,nbfiss,i)=(t3-t1)/(t3-t2)
+             terp(ile,nbfiss,i)=1.0-terp(ile-1,nbfiss,i)
              exit
            endif
          enddo
        endif
        if(iprint.gt.0) then
          write(nsyso,'( &
-         &  '' incident neutron energy with MT454 ..........  '',a8,1h:,1p, &
-         &  e11.3,3h eV)') hname,eeee
+         &  '' incident neutron energy with MT454 ..........  '',i4,1x,a8,1h:, &
+         &  1p,e11.3,3h eV)') nbfiss,hname,eeee
        endif
      enddo
      call tomend(nfp,0,0,scr)
