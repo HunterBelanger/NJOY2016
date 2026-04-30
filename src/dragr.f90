@@ -3437,7 +3437,7 @@ contains
      do i=1,ninter
        eeee(i)=real(energy(ninter-i+1))
      enddo
-     call xsmput(draglib,'ENERGY-YIELD',eeee)
+     call xsmput(draglib,'PENERG-YIELD',eeee)
      deallocate(eeee)
    endif
    !
