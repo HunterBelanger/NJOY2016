@@ -2648,7 +2648,7 @@ contains
    maxfp=nbdpf+50 ! reserve 50 location for lumped fp daughters
    allocate(idreac(nreac,nbiso),ipreac(nfath,nbiso))
    allocate(dener(nreac,nbiso),ddeca(nbiso),prate(nfath,nbiso), &
-   & yield(nbfiss,maxfp,ninter))
+   & yield(ninter,nbfiss,maxfp))
    call draevo(maxfp,nbiso,nbfiss,nbdpf,ninter,nreac,nfath,mylist(1,1),nfp, &
    & ndcy,idreac,dener,ddeca,ipreac,prate,yield,terp,iprint)
    deallocate(terp)
@@ -2680,7 +2680,7 @@ contains
    real(kr) za,rtyp
    integer mylist(nbiso),idreac(nreac,nbiso),ipreac(nfath,nbiso)
    real(kr) awr,energy,dener(nreac,nbiso),ddeca(nbiso),prate(nfath,nbiso), &
-   & yield(nbfiss,maxfp,ninter),terp(maxen,maxfis,ninter)
+   & yield(ninter,nbfiss,maxfp),terp(maxen,maxfis,ninter)
    integer, allocatable, dimension(:) :: indpf
    real(kr), allocatable, dimension(:) :: summ,scr
    character text6*6,hname*8
@@ -2692,7 +2692,7 @@ contains
    ipreac(:nfath,:nbiso)=0
    prate(:nfath,:nbiso)=0.0
    indpf(:nbdpf)=0
-   yield(:nbfiss,:nbdpf,:ninter)=0.0
+   yield(:ninter,:nbfiss,:nbdpf)=0.0
    !
    call repoz(nfp)
    ifpss=0
@@ -2771,7 +2771,7 @@ contains
              ifpp=ifpss
              200 idreac(2,jnd)=ifpp*100+5 ! jnd is a fission fragment
              do i=1,ninter
-               yield(ifis,ifpp,i)=yield(ifis,ifpp,i)+terp(ile,ifis,i)*scr(iof+2)
+               yield(i,ifis,ifpp)=yield(i,ifis,ifpp)+terp(ile,ifis,i)*scr(iof+2)
                summ(i)=summ(i)+terp(ile,ifis,i)*scr(iof+2)
              enddo
            endif
@@ -2979,7 +2979,7 @@ contains
    integer mylist(nbiso),idreac(nreac,nbiso),ipreac(nfath,nbiso),istate(nstate)
    character(len=4) hiso(3,nbiso),hreac(2,maxrea),in(2)
    real(kr) over_half,dener(nreac,nbiso),ddeca(nbiso),prate(nfath,nbiso), &
-   & yield(nbfiss,maxfp,ninter),energy(ninter)
+   & yield(ninter,nbfiss,maxfp),energy(ninter)
    integer, allocatable, dimension(:,:) :: jpreac,jdreac,ipos
    character(len=4), allocatable, dimension(:,:) :: hhhh
    real, allocatable, dimension(:) :: dddd,eeee
@@ -2993,7 +2993,7 @@ contains
    !
    if(nreac.ne.maxrea) call error('dralum','maxrea overflow',' ')
    allocate(jpreac(nfath,nbch),jdreac(nreac-1,nbch),ipos(nbch,2),hhhh(3,nbch))
-   allocate(rrate(nfath,nbch),eener(nreac-1,nbch),eyiel(nbfiss,nbfpch,ninter), &
+   allocate(rrate(nfath,nbch),eener(nreac-1,nbch),eyiel(ninter,nbfiss,nbfpch), &
    & dddd(nbch))
    !
    ! **find the position of the lumped isotopes in the complete chain
@@ -3017,7 +3017,7 @@ contains
        ifi=idreac(2,ida)/100
        if(ifi.eq.0) cycle
        do i=1,ninter
-         write(nsyso,'(i3,1x,2a4,f9.4)') i,hiso(:2,ida),sum(yield(ifi,:maxfp,i))
+         write(nsyso,'(i3,1x,2a4,f9.4)') i,hiso(:2,ida),sum(yield(i,ifi,:maxfp))
        enddo
      enddo
    endif
@@ -3280,11 +3280,11 @@ contains
                  nbdpf=nbdpf+1
                  if(nbdpf.gt.maxfp) call error('dralum','maxfp overflow',' ')
                  ifp=nbdpf
-                 yield(:nbfiss,ifp,:ninter)=0.0
+                 yield(:ninter,:nbfiss,ifp)=0.0
                endif
                do ifi=1,nbfiss
                  do i=1,ninter
-                   yield(ifi,ifp,i)=yield(ifi,ifp,i)+yield(ifi,jfp,i)*prgar
+                   yield(i,ifi,ifp)=yield(i,ifi,ifp)+yield(i,ifi,jfp)*prgar
                  enddo
                enddo
                idreac(2,ida)=ifp*100+5
@@ -3307,7 +3307,7 @@ contains
          jfp=idreac(2,jnd)/100
          do ifi=1,nbfiss
            do i=1,ninter
-             ymax=max(ymax,abs(yield(ifi,jfp,i)))
+             ymax=max(ymax,abs(yield(i,ifi,jfp)))
            enddo
          enddo
        endif
@@ -3413,7 +3413,7 @@ contains
        ipos(iso,2)=ibfp
        do ifi=1,nbfiss
          do i=1,ninter
-           eyiel(ifi,ibfp,i)=real(yield(ifi,idreac(2,ind)/100,ninter-i+1))
+           eyiel(i,ifi,ibfp)=real(yield(ninter-i+1,ifi,idreac(2,ind)/100))
          enddo
        enddo
      endif
@@ -3428,11 +3428,11 @@ contains
          ifi=idreac(2,ida)/100
          if(ifi.eq.0) cycle
          do i=1,ninter
-          write(nsyso,'(i3,1x,2a4,f9.4)') i,hiso(:2,ida),sum(eyiel(ifi,:ibfp,i))
+          write(nsyso,'(i3,1x,2a4,f9.4)') i,hiso(:2,ida),sum(eyiel(i,ifi,:ibfp))
          enddo
        enddo
      endif
-     call xsmput(draglib,'FISSIONYIELD',reshape(eyiel,(/ nbfiss*ibfp*ninter /)))
+     call xsmput(draglib,'FISSIONYIELD',reshape(eyiel,(/ ninter*nbfiss*ibfp /)))
      allocate(eeee(ninter))
      do i=1,ninter
        eeee(i)=real(energy(ninter-i+1))
