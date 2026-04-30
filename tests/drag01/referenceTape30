@@ -26476,7 +26476,7 @@ ND      NT      NHE3
 FISSIONYIELD                                                                    
   1.23997995E-06  9.21000023E-08  1.09998997E-08  9.30999999E-10
 ->       2      12       2       1                                 <-
-ENERGY-YIELD                                                                    
+PENERG-YIELD                                                                    
   0.00000000E+00
 ->       2      12       1      52                                 <-
 DEPLETE-REAC                                                                    
