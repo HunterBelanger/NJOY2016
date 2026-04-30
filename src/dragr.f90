@@ -3178,7 +3178,7 @@ contains
          if(idreac(2,ida)/100.eq.ifi) indifi=ida
        else if(mod(idreac(2,ida),100).eq.5) then
          jfp=idreac(2,ida)/100
-         cyield(ida)=yield(ifi,jfp,1)
+         cyield(ida)=yield(1,ifi,jfp)
        endif
      enddo ! ida
      if(indifi.eq.0) call error('dralum','no fissile index',' ')
