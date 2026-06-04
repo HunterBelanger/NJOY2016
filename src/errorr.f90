@@ -9748,7 +9748,7 @@ contains
    !    24      SHEM CEA 281-group structure
    !    25      SHEM EPM 295-group structure
    !    26      SHEM CEA/EPM 361-group structure
-   !    27      SHEM EPM 315-group structure
+   !    27      SHEM EPM 370-group structure
    !    28      RAHAB AECL 89-group structure
    !    29      CCFE   660-group structure
    !    30      UKAEA 1025-group structure
