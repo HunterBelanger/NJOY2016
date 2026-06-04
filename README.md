@@ -1,5 +1,8 @@
 ![](https://github.com/njoy/NJOY2016/workflows/Continuous%20Integration/badge.svg)
 
+> [!IMPORTANT]
+> This is a modified version of NJOY2016, based on the NEA GitLab version with additional DRAGON related modules (DRAGR, CALENR, and ECCOR) written by Alain Hébert which you can find [here](https://git.oecd-nea.org/njoy/NJOY2016/-/tree/1-include-module-dragr-and-related-energy-meshes-in-groupr?ref_type=heads). The master branch of this repository is a merge of the NEA DRAGON branch and the [upstream NJOY2016 repository](https://github.com/njoy/NJOY2016). Because this version of NJOY2016 is a bit particular, I have also copied the manual for the NEA DRAGON version (found [here](https://git.oecd-nea.org/njoy/NJOY2016-manual/-/tree/1-document-module-dragr-and-related-energy-meshes-in-groupr?ref_type=heads)) and integrated it into this repository. Unfortunately, the git history for that portion has been lost in doing this, but I prefer to have them as one repository for my own use.
+
 # NJOY2016
 
 The NJOY Nuclear Data Processing System is a modular computer code designed to read evaluated data in ENDF format, transform the data in various ways, and output the results as libraries designed to be used in various applications. Each module performs a well defined processing task. The modules are essentially independent programs, and they communicate with each other using input and output files, plus a very few common variables.
