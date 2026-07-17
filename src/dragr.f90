@@ -456,6 +456,8 @@ contains
          if(abs(delig-delecco).le.1.0e-5) then
            igecco=ig
          else if(ener(ig+1).gt.10.0) then
+           write(hsmg,'(44hunable to use ipflag=2 (not an eccolib mesh))')
+           call mess('dragr',hsmg,' ')
            write(hsmg,'(23hlethargy width of group,i5,2h (,1p,e10.2,7h) is no, &
            & 29ht equal to width of group 1 (,e10.2,1h))') ig,delig,delecco
            call error('dragr',hsmg,' ')
