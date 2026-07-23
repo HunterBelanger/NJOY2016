@@ -456,7 +456,7 @@ contains
    ! ***compute igres0 and igres1
    igres0=1
    igres1=ng
-   do ig=ng+1,2,-1
+   do ig=ng,2,-1
      if(eres1.le.0.999d0*ener(ig+1)) igres1=ig-1
    enddo
    do ig=1,ng
@@ -815,7 +815,7 @@ contains
            scr(5)=2
            scr(6)=ng
            scr(7)=1.0
-           scr(8)=proref(ipar,ng,itm)
+           scr(8)=proref(ipar-1,ng,itm)
            j=8
            call listio(0,nout,0,scr,nb,j)
          endif
