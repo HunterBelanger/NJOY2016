@@ -283,8 +283,7 @@ contains
          !** concatenate nimpo to existing nexpo
          call openz(nexpo,0)
          allocate(draglib_in)
-         write(text6,'(4hdrag,i2.2)') nexpo
-         call xsmop(draglib_in,text6,0,1)
+         call xsmop(draglib_in,'dummy',0,1)
          call xsmexp(draglib_in,nexpo,2,2,impy) ! import
          call xsmequ(draglib,draglib_in)
          call xsmcl(draglib,2)
