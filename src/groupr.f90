@@ -4903,7 +4903,7 @@ contains
    !
    !-------------------------------------------------------------------
    use mainio ! provides nsyso
-   use util   ! provides error
+   use util   ! provides error,rdtabl
    use endf   ! provides endf routines and variables
    use physics! provides pi
    ! internals
@@ -5159,7 +5159,7 @@ contains
    !-------------------------------------------------------------------
    use physics ! provides bk
    use endf    ! provides terpa
-   use util    ! provides sigfig,rdtabl
+   use util    ! provides sigfig
    ! externals
    integer::idis,lord
    real(kr)::e,enext,wtf
