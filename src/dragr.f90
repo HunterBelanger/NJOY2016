@@ -356,9 +356,13 @@ contains
          if((l1h.eq.0).and.(l2h.eq.0)) then
            urlimit=c2h
            exit
-         else if((l1h.eq.1).and.(l2h.gt.0)) then
+         else if((l1h.eq.1).and.(l2h.eq.1)) then
            eh=c2h
            urlimit=c2h
+         else if((l1h.eq.1).and.(l2h.gt.1)) then
+           eh=c2h
+           urlimit=c2h
+           exit
          else if(c1h.eq.eh) then
            lurr=.true.
            exit
@@ -1282,7 +1286,6 @@ contains
    gar=0.0d0
    emlog=log(eaut1/em)
    do while(ep*(1.0d0+1.0d-6).lt.eaut1)
-     if(ibin.le.0) call error('drauto','invalid index',' ')
      ep=min(enext,bener(ibin))
      eplog=log(eaut1/ep)
      call gety1(ep,enext,idis,tp,npen,scr1)
@@ -1297,6 +1300,7 @@ contains
        deltau=log(bener(ibin)/bener(ibin+1))
        bsig1(ibin)=gar/deltau
        ibin=ibin-1
+       if(ibin.eq.0) exit
        gar=0.0d0
      endif
      em=ep
@@ -1315,7 +1319,6 @@ contains
    gar=0.0d0
    emlog=log(eaut1/em)
    do while(ep*(1.0d0+1.0d-6).lt.eaut1)
-     if(ibin.le.0) call error('drauto','invalid index',' ')
      ep=min(enext,bener(ibin))
      eplog=log(eaut1/ep)
      call gety1(ep,enext,idis,tp,npen,scr1)
@@ -1330,6 +1333,7 @@ contains
        deltau=log(bener(ibin)/bener(ibin+1))
        bsig2(ibin)=gar/deltau
        ibin=ibin-1
+       if(ibin.eq.0) exit
        gar=0.0d0
      endif
      em=ep
@@ -1350,7 +1354,6 @@ contains
      gar=0.0d0
      emlog=log(eaut1/em)
      do while(ep*(1.0d0+1.0d-6).lt.eaut1)
-       if(ibin.le.0) call error('drauto','invalid index',' ')
        ep=min(enext,bener(ibin))
        eplog=log(eaut1/ep)
        call gety1(ep,enext,idis,tp,npen,scr1)
@@ -1365,6 +1368,7 @@ contains
          deltau=log(bener(ibin)/bener(ibin+1))
          bsig3(ibin)=gar/deltau
          ibin=ibin-1
+         if(ibin.eq.0) exit
          gar=0.0d0
        endif
        em=ep
@@ -2512,7 +2516,7 @@ contains
        if(enrgs(ile).gt.2.0e6) cycle
        do ifp=1,nbfp
          iof=6+(ifp-1)*4+1
-         if(scr(iof+2).gt.1.0e-10) then
+         if(scr(iof+2).gt.1.0e-15) then
            iz=nint(scr(iof)/1000+0.1)
            ifps=nint(scr(iof+1)+0.1)
            ia=mod(nint(scr(iof)+0.1),1000)
@@ -2749,7 +2753,7 @@ contains
        if(energy.le.2.0e6) then
          do ifp=1,nbfp
            iof=6+(ifp-1)*4+1
-           if(scr(iof+2).gt.1.0e-10) then
+           if(scr(iof+2).gt.1.0e-15) then
              iz=nint(scr(iof)/1000+0.1)
              ifps=nint(scr(iof+1)+0.1)
              ia=mod(nint(scr(iof)+0.1),1000)
