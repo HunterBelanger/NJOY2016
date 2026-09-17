@@ -60,6 +60,8 @@ contains
    !   prflag    probability table flag: off/on = 0/1. prflag=1 if
    !             purr information is available. (default=0)
    !   idecay    fission product decay heat option (0 include, 1 don't)
+   !   imode     Serpent edepmode=0 (0/1/2=off, on with MF1/MT458, on
+   !             with MF3/MT18)
    !   iprint    long print option (0/1=minimum/maximum) (default=0)
    ! card 2 hollerith identification for the library (nimpo=0 only)
    !   labell    72 character identification for the library
@@ -139,7 +141,7 @@ contains
    character(len=150) hsmg
    integer i,ig,igaut0,igaut1,igrest,igres0,igres1,igecco,iig,ipflag,iza, &
    & nb,nbesp,ndcy,nendf,nexpo,nfp,nimpo,npen,nw,ilong,ilong1,ityxsm,irflag, &
-   & idecay,iprint,ner,igar(1),impy
+   & idecay,iprint,ner,igar(1),imode,impy
    logical lsame,lurr,lkerma,lexist,lres
    real(kr) ener(maxgr+1),eesp(maxesp+1),delecco,delig,eh
    real eespi(maxesp+1),gar(1)
@@ -165,9 +167,10 @@ contains
    ipflag=0
    irflag=0
    idecay=0
+   imode=0
    iprint=0
    read(nsysi,*) nendf,npen,ngen,nfp,ndcy,nimpo,nexpo,ipflag,irflag,idecay, &
-   & iprint
+   & imode,iprint
    impy=max(0,iprint-1)
    allocate(scr(maxa))
    !
@@ -183,8 +186,9 @@ contains
    &  '' scattering storage flag ..................... '',i10/ &
    &  '' purr information flag ....................... '',i10/ &
    &  '' FP decay heat option (0 include, 1 dont) .... '',i10/ &
+   &  '' heating factor mode (0 default, >0 edepmode=0)'',i10/ &
    &  '' print option (0 min, 1 max) ................. '',i10)') &
-   &  nendf,npen,ngen,nfp,ndcy,nimpo,nexpo,ipflag,irflag,idecay,iprint
+   &  nendf,npen,ngen,nfp,ndcy,nimpo,nexpo,ipflag,irflag,idecay,imode,iprint
    if(nendf.ne.0) call openz(nendf,0)
    if(npen.ne.0) call openz(npen,0)
    if(ngen.ne.0) call openz(ngen,0)
@@ -485,7 +489,7 @@ contains
      !
      ! ***generate draglib file for this material
      call dramat(nendf,ngen,matno,ng,igrest,igres0,igres1,igecco,ipflag,nbesp, &
-     & iesp,ener,lkerma)
+     & iesp,ener,lkerma,imode)
      write(nsyso,'(/ &
      &    '' heatr kerma factor availability ............. '',l10)') lkerma
      if(nendf.ne.0) then
@@ -708,7 +712,7 @@ contains
    end subroutine drahd
    !
    subroutine dramat(nendf,ngen,matno,ng,igrest,igres0,igres1,igecco,ipflag, &
-   & nbesp,iesp,ener,lkerma)
+   & nbesp,iesp,ener,lkerma,imode)
    !-----------------------------------------------------------------
    !   write draglib data to the xsm (direct access) file for endf
    !   material matno
@@ -721,7 +725,7 @@ contains
    parameter (maxa=3000,maxgr=2000,maxnl=8,maxnz=30,maxtmp=100,maxedi=17, &
    & maxedi2=57,lz=6)
    integer nendf,ngen,matno,ng,igrest,igres0,igres1,igecco,ipflag,nbesp, &
-   & iesp(nbesp+1)
+   & iesp(nbesp+1),imode
    real(kr) aa(6),ener(ng+1)
    logical lkerma,lfind,lover,exist,exist2,exist3,lfiss
    character cd*4,hsmg*131,hmt*8
@@ -1050,7 +1054,7 @@ contains
      ! ***create H-FACTOR if lkerma=.false.
      if(.not.lkerma) then
        ! use the legacy Dragon formula based on Q and pseudo-Q values
-       call draq(nendf,ngen,matno,ytemp,nz0,ng,igfirs(1),iglast(1))
+       call draq(nendf,ngen,matno,ytemp,nz0,ng,igfirs(1),iglast(1),imode)
      endif
      !
      ! ***process fission x-sections.
@@ -1462,14 +1466,15 @@ contains
    100 format(10(1p,e12.5,1h,))
    end subroutine drauto
    !
-   subroutine draq(nendf,ngen,matno,ytemp,nz0,ng,igfirs,iglast)
+   subroutine draq(nendf,ngen,matno,ytemp,nz0,ng,igfirs,iglast,imode)
    !-----------------------------------------------------------------
    !   recompute kerma factors using the legacy Dragon method based
    !   on Q and pseudo-Q information.
+   !   imode>0: Serpent edepmode=0 is used
    !-----------------------------------------------------------------
    use endf   ! provides endf routines and variables
    use util   ! provides error
-   integer, intent(in) :: nendf,ngen,matno,nz0,ng,igfirs,iglast
+   integer, intent(in) :: nendf,ngen,matno,nz0,ng,igfirs,iglast,imode
    real(kr), intent(in) :: ytemp
    integer :: maxa,maxgr,maxnl,maxnz,maxedi,nb,nw,ngtmp,nl,nz,lz
    parameter (maxa=3000,maxgr=2000,maxnl=8,maxnz=30,maxedi=12,lz=6)
@@ -1506,6 +1511,8 @@ contains
      if(ngtmp.ne.ng) call error('draq','inconsistent ng.',' ')
      if(nztmp.gt.maxnz) call error('draq','maxnz overflow.',' ')
      if(malist1(ied).eq.18) lfiss=.true.
+     !  ***cycle if edepmode=0 is enabled
+     if((imode.gt.0).and.(malist1(ied).ne.18)) cycle
      nz=max(nz,nztmp)
      do iz=1,nztmp
        do ig=igfirs,iglast-1
@@ -1529,8 +1536,9 @@ contains
      ! recover the Q or pseudo-Q of the reaction (may be negative)
      call contio(nendf,0,0,scr,nb,nw)
      kap=c1h
-     if(mth.eq.18) then
+     if((mth.eq.18).and.(imode.le.1)) then
        ! ***fission -- recover pseudo-Q kappa info in mf=1, mt=458 if exists
+       ! if imode=2, use MF3/MT18 value. Otherwise, try to find MF1/MT458 data.
        call repoz(nendf)
        lfind=.false.
        do while (.not.lfind)
@@ -1570,14 +1578,24 @@ contains
    do ig=1,igmax
      vector(ig)=real(sigq(ig,1))
    enddo
-   call xsmput(draglib,'H-FACTOR',vector(1:igmax))
+   if(imode.eq.0) then
+     call xsmput(draglib,'H-FACTOR',vector(1:igmax))
+   else
+     ! used with Serpent edepmode=0. Only fission energy is used.
+     call xsmput(draglib,'H-FACTOR-NF',vector(1:igmax))
+   endif
    do iz=1,nz-1
      write (cd,'(i4.4)') nz0+iz
      call xsmsix(draglib,'SUBMAT'//cd,1)
      do ig=1,iglast-1
        vector(ig)=real(sigq(ig,nz-iz+1))
      enddo
-     call xsmput(draglib,'H-FACTOR',vector(1:iglast-1))
+     if(imode.eq.0) then
+       call xsmput(draglib,'H-FACTOR',vector(1:iglast-1))
+     else
+       ! used with Serpent edepmode=0. Only fission energy is used.
+       call xsmput(draglib,'H-FACTOR-NF',vector(1:iglast-1))
+     endif
      call xsmsix(draglib,' ',2)
    enddo ! iz
    deallocate(vector)
