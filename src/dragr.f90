@@ -1582,7 +1582,7 @@ contains
      call xsmput(draglib,'H-FACTOR',vector(1:igmax))
    else
      ! used with Serpent edepmode=0. Only fission energy is used.
-     call xsmput(draglib,'H-FACTOR-NF',vector(1:igmax))
+     call xsmput(draglib,'H-FAC-NF',vector(1:igmax))
    endif
    do iz=1,nz-1
      write (cd,'(i4.4)') nz0+iz
@@ -1594,7 +1594,7 @@ contains
        call xsmput(draglib,'H-FACTOR',vector(1:iglast-1))
      else
        ! used with Serpent edepmode=0. Only fission energy is used.
-       call xsmput(draglib,'H-FACTOR-NF',vector(1:iglast-1))
+       call xsmput(draglib,'H-FAC-NF',vector(1:iglast-1))
      endif
      call xsmsix(draglib,' ',2)
    enddo ! iz
