@@ -219,6 +219,20 @@ MF/MT=3/{\tt MT} ({\tt MT} is the reaction index) and where $\sigma_{r,g}$ is
 the microscopic cross section for a non-elastic reaction $r$ in energy group
 $g$.
 
+{\tt edepmode} $=0$ mode is a simplified energy deposition mode available in
+the Serpent Monte Carlo code.
+In this mode, it is assumed that all energy deposited is due to fission,
+multiplied
+by an empirical factor taking into account other reactions. The formula is
+$$
+H_g=202.27 \ {\rm MeV}\times {Q_{\tt fiss}^{\tt er}\over
+Q_{\tt fiss}^{\tt er,U235}} \, \sigma_{{\tt fiss},g}
+$$
+\noindent where $Q_{\tt fiss}^{\tt er,U235}$ is the pseudo-$Q$ value of
+$^{235}$U. This option is activited by setting {\tt imode} $=1$ or $2$,
+depending if the fission pseudo-$Q$ values are recovered from MF1/MT458 or
+MF3/MT18, respectively.
+
 \item[{\tt HEATR} is used:] Total kerma factors $H_g^{\tt mt301}$ and fission
 kerma factors $H_g^{\tt mt318}$ are recovered from the GENDF file.
 {\tt H-FACTOR} information for each isotope is also using fission $Q$ values
@@ -364,6 +378,8 @@ have been any changes.
    !   prflag    probability table flag: off/on = 0/1. prflag=1 if
    !             purr information is available. (default=0)
    !   idecay    fission product decay heat option (0 include, 1 don't)
+   !   imode     Serpent edepmode=0 (0/1/2=off, on with MF1/MT458, on
+   !             with MF3/MT18)
    !   iprint    long print option (0/1=minimum/maximum) (default=0)
    ! card 2 hollerith identification for the library (nimpo=0 only)
    !   labell    72 character identification for the library
